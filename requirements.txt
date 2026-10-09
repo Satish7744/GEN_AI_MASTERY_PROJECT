@@ -1,5 +1,6 @@
 streamlit
 python-dotenv
-scikit-learn
+chromadb
+pypdf
 groq
 google-genai
