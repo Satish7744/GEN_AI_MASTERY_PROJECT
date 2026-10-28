@@ -1,11 +1,10 @@
-#Environment Variables
+# Environment variables
 .env
 .env/
 
-#Python cache
+# Python cache
 __pycache__/
 *.pyc
-
 
 # Virtual environments
 venv/
@@ -13,6 +12,7 @@ venv/
 env/
 
 # Databases and vector stores
+db/
 chroma_db/
 vectorstore/
 chroma.sqlite3/
@@ -20,4 +20,3 @@ chroma.sqlite3/
 
 # Streamlit secrets
 .streamlit/secrets.toml
-
