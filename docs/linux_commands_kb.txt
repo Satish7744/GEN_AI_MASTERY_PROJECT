@@ -1,0 +1,914 @@
+# Linux Extended Knowledge Base (Concepts, Internals, Administration, Scripting, Security, Troubleshooting)
+
+Format note for RAG: every entry starts with a `###` heading and is self-contained. Split chunks on `###` headings and keep the `##` category as metadata. This file complements linux_commands_kb.txt.
+
+---
+
+## CATEGORY 1: LINUX CONCEPTS AND BASICS
+
+### What is Linux?
+Linux is a free, open-source operating system kernel created by Linus Torvalds in 1991. The kernel manages hardware (CPU, memory, disks, network) and lets programs run. When people say "Linux" they usually mean a complete operating system built around the Linux kernel plus GNU tools, a shell, a package manager, and often a desktop environment. Linux runs servers, cloud systems, Android phones, supercomputers, routers, embedded devices, and developer machines. Most web servers and cloud instances run Linux. You control it mostly through the terminal using commands.
+
+### What is open source and what license does Linux use?
+Linux is released under the GNU General Public License version 2 (GPLv2). Anyone can read, modify, and redistribute the source code, provided derived works keep the same license. This is why there are hundreds of distributions.
+
+### What is a Linux distribution (distro)?
+A distribution packages the Linux kernel with software, a package manager, and default settings. Debian family: Debian, Ubuntu, Linux Mint, Kali, Pop!_OS (use apt and .deb packages). Red Hat family: RHEL, Fedora, CentOS Stream, Rocky Linux, AlmaLinux (use dnf/yum and .rpm packages). Arch family: Arch, Manjaro (use pacman). SUSE family: openSUSE (zypper). Alpine (apk, tiny, popular in Docker containers). Ubuntu is the most common choice for beginners and servers. Check your distro with `cat /etc/os-release`.
+
+### What is the difference between the Linux kernel, the shell, and the terminal?
+- Kernel: the core of the operating system that talks to hardware and manages processes, memory, files and devices.
+- Shell: the program that reads and runs your commands. Bash is the most common default; others are zsh, fish, dash, and sh.
+- Terminal (terminal emulator): the window or app where you type commands and see output (GNOME Terminal, Konsole, Windows Terminal, iTerm).
+- Command: a program or built-in the shell runs, such as ls or grep.
+- CLI: command line interface. GUI: graphical user interface.
+
+### What is the Linux file system hierarchy?
+Linux uses one directory tree starting at `/` (root). Everything is a file or directory.
+- `/` root of the whole system.
+- `/home` users' personal files (for example /home/satish).
+- `/root` home directory of the root user.
+- `/etc` system configuration files (text files).
+- `/var` variable data: logs (/var/log), caches, mail, spool, databases.
+- `/tmp` temporary files, usually cleared on reboot.
+- `/usr` installed programs, libraries, documentation (/usr/bin, /usr/lib, /usr/share, /usr/local).
+- `/bin` and `/sbin` essential commands (often symlinks to /usr/bin and /usr/sbin on modern distros).
+- `/lib` and `/lib64` shared libraries.
+- `/opt` optional third-party software.
+- `/dev` device files (disks like /dev/sda, terminals, /dev/null, /dev/zero, /dev/random).
+- `/proc` virtual files showing process and kernel information (for example /proc/cpuinfo, /proc/meminfo).
+- `/sys` virtual files for kernel and hardware settings.
+- `/boot` kernel and bootloader files.
+- `/mnt` and `/media` mount points for disks and USB drives.
+- `/run` runtime data (PID files, sockets) since boot.
+- `/srv` data served by the system (web, ftp).
+There are no drive letters like C: or D:. Paths are case-sensitive and use forward slashes.
+
+### What does "everything is a file" mean in Linux?
+Linux represents many things as files: regular files, directories, devices (/dev/sda), processes (/proc/PID), sockets, pipes, and kernel settings (/sys). You can read and write them with ordinary tools. Example: `cat /proc/cpuinfo` shows CPU details, `echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward` changes a kernel setting.
+
+### What are the types of files in Linux?
+`ls -l` first character shows the type: `-` regular file, `d` directory, `l` symbolic link, `c` character device, `b` block device, `s` socket, `p` named pipe (FIFO). Use `file name` to detect the actual content type.
+
+### What are hidden files in Linux?
+Files and folders whose names start with a dot (.bashrc, .ssh, .git, .config) are hidden. Show them with `ls -a`. Configuration for programs is often stored in dotfiles in your home directory.
+
+### What is the root user, UID, and sudo?
+Root is the all-powerful administrator account with user ID 0. Normal users have UID 1000 and above on most distros, system accounts below 1000. Do not work as root for daily tasks. Use `sudo command` to run one command with admin rights. Root can delete or change anything, so mistakes can break the system.
+
+### What is the difference between Linux and Windows?
+Linux is open source and free, uses a single directory tree without drive letters, is case-sensitive, and is mostly managed from the terminal and package managers. Windows is proprietary, uses drive letters (C:), backslashes in paths, and is mostly managed through graphical tools. Linux dominates servers, cloud, containers, and development; Windows dominates desktops. You can run Linux on Windows with WSL or a virtual machine, or dual boot.
+
+### What is the difference between Linux and Unix?
+Unix is the original family of operating systems from AT&T Bell Labs (1970s). Linux is a Unix-like system written from scratch, not derived from Unix code. They share concepts, commands, and POSIX compatibility. macOS is certified Unix. BSD systems (FreeBSD, OpenBSD) are Unix descendants.
+
+### What is WSL (Windows Subsystem for Linux)?
+WSL lets you run a Linux environment (for example Ubuntu) on Windows without a separate virtual machine setup. Install with `wsl --install` in PowerShell (admin), restart, then open Ubuntu from the Start menu. WSL2 uses a real Linux kernel. Windows drives appear under `/mnt/c`. You can use apt, git, python, docker, and all Linux commands. Keep project files inside the Linux file system (~/projects) for better performance.
+
+### How do I install Linux?
+Download an ISO (for example Ubuntu), write it to a USB drive with a tool such as Rufus, balenaEtcher, or `dd`, boot from the USB (BIOS/UEFI boot menu key like F12 or Esc), and follow the installer. Options: replace the OS, dual boot alongside Windows (needs free partition space and disabling fast startup), or use a virtual machine (VirtualBox, VMware, Hyper-V) or WSL. Back up your data first.
+
+### What are the first Linux commands a beginner should learn?
+pwd (where am I), ls (list files), cd (change directory), mkdir (create folder), touch (create file), cp (copy), mv (move or rename), rm (delete), cat (show a file), less (page through a file), grep (search text), find (find files), chmod (permissions), sudo (run as admin), man (manual page), apt install (install software on Ubuntu/Debian), history (previous commands), clear (clear the screen).
+
+---
+
+## CATEGORY 2: BOOT PROCESS, INIT, AND KERNEL
+
+### How does the Linux boot process work?
+1. Firmware (BIOS or UEFI) runs hardware checks (POST) and finds a boot device.
+2. The bootloader (GRUB2 usually) loads the kernel and the initramfs into memory.
+3. The kernel initializes hardware, mounts the root filesystem, and starts the first process.
+4. The init system (systemd on most distros) starts as PID 1 and brings up services and targets.
+5. A login prompt or graphical display manager appears.
+Boot problems: check GRUB menu, `journalctl -b -p err`, `dmesg`, and rescue mode.
+
+### What is the kernel and how do I check its version?
+The kernel is the core that manages hardware and resources. Check it with `uname -r` (release), `uname -a` (all details), or `cat /proc/version`. Kernel updates need a reboot to take effect.
+
+### What are kernel modules and how do I manage them?
+Modules are pieces of kernel code (drivers) loaded on demand. `lsmod` lists loaded modules, `modinfo name` shows details, `sudo modprobe name` loads one, `sudo modprobe -r name` unloads it. Persistent loading: list module names in a file under `/etc/modules-load.d/`. Blacklist: add `blacklist name` to a file in `/etc/modprobe.d/`.
+
+### What is systemd and what are targets?
+systemd is the init system and service manager (PID 1). Targets group units, similar to old runlevels: `poweroff.target`, `rescue.target` (single user), `multi-user.target` (text mode, networking), `graphical.target` (desktop), `reboot.target`. Commands: `systemctl get-default`, `sudo systemctl set-default multi-user.target`, `sudo systemctl isolate rescue.target`.
+
+### What is the difference between SysV init runlevels and systemd targets?
+Runlevel 0 = poweroff, 1 = single user (rescue), 3 = multi-user text mode (multi-user.target), 5 = graphical (graphical.target), 6 = reboot. Legacy `runlevel` and `init N` commands still work through compatibility on many systems.
+
+### How do I reboot or shut down Linux?
+`sudo reboot`, `sudo shutdown -h now` (halt now), `sudo shutdown -r +10` (reboot in 10 minutes), `sudo poweroff`, `sudo shutdown -c` cancel a scheduled shutdown, `systemctl reboot`.
+
+### How do I recover a forgotten root password or boot in rescue mode?
+At the GRUB menu press `e`, append `systemd.unit=rescue.target` (or `init=/bin/bash` for a minimal shell) to the line starting with `linux`, press Ctrl+X to boot. If root is read-only, run `mount -o remount,rw /`. Change the password with `passwd`. Reboot with `exec /sbin/init` or by restarting. Disk-encrypted or locked-down systems may block this.
+
+### What is GRUB and how do I update it?
+GRUB2 is the most common bootloader. Config is generated from `/etc/default/grub` and `/etc/grub.d/`. After changes run `sudo update-grub` (Debian/Ubuntu) or `sudo grub2-mkconfig -o /boot/grub2/grub.cfg` (RHEL/Fedora). Common edits: `GRUB_TIMEOUT`, `GRUB_CMDLINE_LINUX_DEFAULT`.
+
+### What is initramfs?
+A small temporary root filesystem loaded by the bootloader that contains drivers needed to mount the real root filesystem. Rebuild with `sudo update-initramfs -u` (Debian/Ubuntu) or `sudo dracut -f` (RHEL/Fedora).
+
+---
+
+## CATEGORY 3: ADDITIONAL FILE AND TEXT COMMANDS
+
+### basename and dirname — split a path
+`basename /home/satish/file.txt` prints file.txt, `basename file.txt .txt` prints file, `dirname /home/satish/file.txt` prints /home/satish.
+
+### realpath and readlink — resolve paths
+`realpath file` prints the absolute path, `readlink -f link` follows a symlink fully.
+
+### mktemp — create a safe temporary file or directory
+`mktemp` creates a unique file in /tmp, `mktemp -d` creates a directory. Use in scripts: `tmp=$(mktemp)`.
+
+### tee — write output to a file and the screen
+`command | tee file.txt`, `command | tee -a file.txt` append, `command | sudo tee /etc/file` to write protected files.
+
+### tac and rev — reverse
+`tac file` prints lines in reverse order (opposite of cat), `rev` reverses characters in each line.
+
+### nl — number lines
+`nl file.txt` numbers non-empty lines, `nl -ba file.txt` numbers all.
+
+### paste, join, comm — combine or compare files
+`paste a.txt b.txt` merges lines side by side, `paste -d, a.txt b.txt` with a delimiter. `join` combines lines with a common field (sorted input). `comm -12 a.txt b.txt` prints lines common to two sorted files, `comm -23` only in the first.
+
+### column — format output into columns
+`mount | column -t` aligns columns, `column -s, -t data.csv` shows CSV as a table.
+
+### fold and fmt — wrap text
+`fold -w 80 -s file` wraps at 80 characters on spaces, `fmt -w 72 file` reflows paragraphs.
+
+### expand and unexpand — tabs and spaces
+`expand -t 4 file` converts tabs to 4 spaces.
+
+### split — split a large file
+`split -l 1000 big.txt part_` splits into 1000-line pieces, `split -b 100M big.iso part_` splits by size. Rejoin with `cat part_* > big.iso`.
+
+### shuf — shuffle lines or pick random lines
+`shuf file.txt`, `shuf -n 5 file.txt` five random lines, `shuf -i 1-100 -n 1` a random number.
+
+### seq — generate number sequences
+`seq 5` prints 1 to 5, `seq 2 2 10` prints 2 4 6 8 10, `seq -w 1 10` zero-padded.
+
+### yes — repeat output
+`yes | command` auto-answers y to prompts, `yes text | head -3`.
+
+### sleep, timeout, time
+`sleep 5` waits 5 seconds, `timeout 10s command` stops a command after 10 seconds, `time command` prints how long a command took (real, user, sys).
+
+### truncate — resize or empty a file
+`truncate -s 0 file.log` empties a file without deleting it (safe for live logs), `truncate -s 1G file` creates a 1 GB sparse file.
+
+### shred — securely overwrite a file
+`shred -u -n 3 file` overwrites and deletes. Not reliable on SSDs or journaling or copy-on-write filesystems.
+
+### install — copy with permissions
+`sudo install -m 755 script.sh /usr/local/bin/script` copies and sets mode.
+
+### lsattr and chattr — file attributes
+`lsattr file` shows attributes, `sudo chattr +i file` makes a file immutable (cannot be changed or deleted, even by root), `sudo chattr -i file` removes it.
+
+### getfacl and setfacl — access control lists
+ACLs give fine-grained permissions beyond owner/group/others. `getfacl file`, `setfacl -m u:alice:rw file` grant alice read-write, `setfacl -x u:alice file` remove, `setfacl -R -m g:dev:rx dir/`, `setfacl -b file` remove all ACLs. A `+` after the permission string in `ls -l` means ACLs exist.
+
+### ncdu — interactive disk usage
+`ncdu /` browses directories by size. Install with `sudo apt install ncdu`. Press d to delete, q to quit.
+
+### htop — improved process viewer
+Install with `sudo apt install htop`. F6 sort, F9 kill, F4 filter, F5 tree view, F10 or q quit.
+
+### strace and ltrace — trace system and library calls
+`strace command` shows system calls, `strace -p PID` attach to a running process, `strace -e openat command` filter, `strace -c command` summary. Useful for "why does this program fail to start or find a file".
+
+### ulimit — resource limits
+`ulimit -a` shows limits, `ulimit -n` open files limit, `ulimit -n 65535` raises it for the shell. Persistent limits go in `/etc/security/limits.conf`. "Too many open files" errors relate to this.
+
+### sysctl — kernel parameters
+`sysctl -a` lists parameters, `sysctl net.ipv4.ip_forward`, `sudo sysctl -w net.ipv4.ip_forward=1` temporary change. Persist by adding to `/etc/sysctl.conf` or `/etc/sysctl.d/*.conf`, then `sudo sysctl --system`.
+
+### watch, script, and tput
+`watch -n 1 'ls | wc -l'` repeat a command, `script session.log` records a terminal session (end with exit), `tput clear` and `tput cols` terminal control.
+
+### bc and expr — calculations
+`echo "scale=2; 10/3" | bc` prints 3.33, `expr 5 + 3`, and in bash `echo $((5 * 3))`.
+
+### sha1sum, md5sum, cksum, base64, xxd, hexdump, od
+`xxd file | head` hex dump, `hexdump -C file`, `base64 file`, `md5sum file`. Use sha256sum for security checks. md5 and sha1 are not secure for cryptographic use.
+
+### env, printenv, export, set, declare
+`env` shows exported variables, `printenv HOME`, `export VAR=value`, `set` shows all shell variables and functions, `declare -p VAR`.
+
+### rename and mmv — bulk rename
+Debian: `rename 's/\.jpeg$/.jpg/' *.jpeg` (perl rename). RHEL variant: `rename .jpeg .jpg *.jpeg`. Portable loop: `for f in *.jpeg; do mv "$f" "${f%.jpeg}.jpg"; done`.
+
+### lsof extras and fuser
+`lsof -p PID` files opened by a process, `lsof +D /dir` open files under a directory, `fuser -v /path` shows processes using a file or mount, `fuser -k 8080/tcp` kills the process using a port.
+
+### whatis, apropos, info, tldr
+`whatis ls` one-line description, `apropos network` search man page descriptions, `info coreutils`, `tldr tar` community examples.
+
+### Process substitution and here-documents
+`diff <(sort a.txt) <(sort b.txt)` compares outputs of commands. Here-doc:
+```
+cat <<'EOF' > file.txt
+line 1
+line 2
+EOF
+```
+Here-string: `grep foo <<< "foo bar"`.
+
+---
+
+## CATEGORY 4: SHELL INTERNALS AND CONFIGURATION
+
+### What is the difference between .bashrc, .bash_profile, .profile, and /etc/profile?
+- `/etc/profile` and `/etc/profile.d/*.sh`: system-wide for login shells.
+- `~/.bash_profile` or `~/.profile`: user login shell (runs once at login). Typically sources ~/.bashrc.
+- `~/.bashrc`: interactive non-login shells (every new terminal window). Put aliases, PATH, prompt here.
+- `~/.bash_logout`: runs at logout.
+After editing run `source ~/.bashrc` (or `. ~/.bashrc`) to apply without reopening the terminal.
+
+### How do I change my default shell?
+`chsh -s /bin/zsh` (log out and in). List allowed shells in `/etc/shells`. Check current shell with `echo $SHELL`.
+
+### How do I customize the bash prompt?
+Set `PS1` in ~/.bashrc, for example `export PS1='\u@\h:\w\$ '`. Codes: `\u` user, `\h` host, `\w` working directory, `\$` prompt symbol, `\t` time. Add colors with escape codes like `\[\e[32m\]` and reset with `\[\e[0m\]`.
+
+### What are standard input, output, and error?
+File descriptors: 0 = stdin (keyboard), 1 = stdout (normal output), 2 = stderr (error output). Redirect: `>` stdout, `2>` stderr, `&>` both, `2>&1` send stderr to stdout, `<` input. Pipes `|` connect stdout of one command to stdin of the next.
+
+### What are exit codes and how do I check them?
+Every command returns an exit status in `$?`: 0 means success, nonzero means failure (1 general error, 2 misuse, 126 not executable, 127 command not found, 130 interrupted by Ctrl+C, 137 killed by SIGKILL/OOM, 139 segmentation fault). Use `command && echo ok || echo failed`.
+
+### What are shell expansions and quoting rules?
+Order: brace expansion `{a,b}`, tilde `~`, parameter `$VAR`, command substitution `$(cmd)`, arithmetic `$((1+2))`, word splitting, globbing `*`. Single quotes keep everything literal, double quotes allow `$` expansion, backslash escapes one character. Always quote variables: `"$file"`, to survive spaces.
+
+### How do I use command substitution and arithmetic?
+`today=$(date +%F)`, `count=$(ls | wc -l)`, `echo $((3 * (2 + 4)))`, `let i++`, `(( i += 5 ))`.
+
+### How do I use tab completion, history search, and shortcuts effectively?
+Tab completes names, double Tab lists options. `Ctrl+R` reverse history search, `!!` last command, `!$` last argument of the previous command, `!git` last command starting with git, `Alt+.` insert last argument. `history | grep ssh`. Increase history with `HISTSIZE` and `HISTFILESIZE` in ~/.bashrc.
+
+### How do I run multiple commands, subshells, and groups?
+`a; b` sequential, `a && b` run b only if a succeeds, `a || b` run b if a fails, `(cd /tmp && ls)` subshell (directory change does not affect the parent), `{ a; b; } > out.txt` group redirect.
+
+### What is the PATH variable and how do I change it?
+PATH is a colon-separated list of directories searched for commands. `echo $PATH`. Add one: `export PATH="$PATH:$HOME/.local/bin"` in ~/.bashrc. Command not found often means the directory is not in PATH.
+
+### What are aliases, functions, and how do they differ?
+Alias is a simple text substitution: `alias gs='git status'`. A function can take arguments and logic:
+```
+mkcd() { mkdir -p "$1" && cd "$1"; }
+```
+Put both in ~/.bashrc. `type name` shows what a name is.
+
+---
+
+## CATEGORY 5: BASH SCRIPTING IN DEPTH
+
+### What is a shell script and how do I write and run one?
+A script is a text file of commands. First line (shebang) `#!/bin/bash` chooses the interpreter. Make executable `chmod +x hello.sh`, run `./hello.sh` or `bash hello.sh`.
+```
+#!/bin/bash
+echo "Hello, $USER"
+```
+
+### How do I use variables, arguments, and read input in a script?
+```
+name="Satish"
+echo "Hi $name"
+echo "Script: $0, first arg: $1, all args: $@, count: $#"
+read -p "Enter your name: " user
+```
+Default values: `${var:-default}`. Required check: `: "${VAR:?must be set}"`.
+
+### How do I write if statements and tests?
+```
+if [[ -f file.txt ]]; then
+  echo "exists"
+elif [[ -d dir ]]; then
+  echo "directory"
+else
+  echo "missing"
+fi
+```
+File tests: `-e` exists, `-f` regular file, `-d` directory, `-r` readable, `-w` writable, `-x` executable, `-s` not empty, `-L` symlink. String tests: `-z` empty, `-n` not empty, `==`, `!=`. Number tests: `-eq -ne -lt -le -gt -ge`. Combine with `&&`, `||`, `!`.
+
+### How do I write loops in bash?
+```
+for f in *.txt; do echo "$f"; done
+for i in {1..5}; do echo "$i"; done
+for ((i=0; i<5; i++)); do echo "$i"; done
+while read -r line; do echo "$line"; done < file.txt
+until ping -c1 host >/dev/null; do sleep 1; done
+```
+`break` exits a loop, `continue` skips to the next iteration.
+
+### How do I write functions and return values?
+```
+add() { echo $(( $1 + $2 )); }
+result=$(add 2 3)
+```
+`return N` sets an exit status (0 to 255); use echo to return data.
+
+### How do I use case statements?
+```
+case "$1" in
+  start) echo "starting" ;;
+  stop)  echo "stopping" ;;
+  *)     echo "Usage: $0 {start|stop}" ;;
+esac
+```
+
+### How do I use arrays and associative arrays?
+```
+fruits=(apple banana cherry)
+echo "${fruits[1]}"        # banana
+echo "${fruits[@]}"        # all
+echo "${#fruits[@]}"       # length
+declare -A age=([alice]=30 [bob]=25)
+echo "${age[alice]}"
+```
+
+### How do I manipulate strings in bash?
+`${#s}` length, `${s:2:3}` substring, `${s/old/new}` replace first, `${s//old/new}` replace all, `${s#prefix}` remove prefix, `${s%suffix}` remove suffix, `${s,,}` lowercase, `${s^^}` uppercase. Example: `f=photo.jpg; echo "${f%.jpg}"` prints photo.
+
+### How do I handle errors safely in scripts?
+Start with `set -euo pipefail`: `-e` exit on error, `-u` error on undefined variables, `-o pipefail` fail if any command in a pipe fails. Use `trap 'echo "failed at line $LINENO"' ERR`, and `trap 'rm -f "$tmp"' EXIT` for cleanup.
+
+### How do I parse command-line options in a script?
+```
+while getopts "f:v" opt; do
+  case $opt in
+    f) file=$OPTARG ;;
+    v) verbose=1 ;;
+    *) echo "Usage: $0 [-v] -f file"; exit 1 ;;
+  esac
+done
+```
+
+### How do I debug a bash script?
+`bash -x script.sh` prints each command as it runs, `set -x` and `set +x` inside a script, `bash -n script.sh` checks syntax only, and use ShellCheck (`shellcheck script.sh`) to find bugs and bad practices.
+
+### How do I schedule and log a script with cron safely?
+Use absolute paths, set PATH at the top of the script, redirect output: `0 2 * * * /home/satish/backup.sh >> /var/log/backup.log 2>&1`. Use `flock -n /tmp/backup.lock script.sh` to prevent overlapping runs.
+
+### Example: backup script
+```
+#!/bin/bash
+set -euo pipefail
+src="$HOME/projects"
+dest="/backup/projects_$(date +%F).tar.gz"
+tar -czf "$dest" "$src"
+find /backup -name 'projects_*.tar.gz' -mtime +14 -delete
+echo "Backup done: $dest"
+```
+
+### Example: check disk usage and warn
+```
+#!/bin/bash
+limit=90
+use=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+if (( use > limit )); then
+  echo "Disk usage is ${use}% on /"
+fi
+```
+
+---
+
+## CATEGORY 6: USERS, GROUPS, AND ACCESS CONTROL IN DEPTH
+
+### What are the important account files (/etc/passwd, /etc/shadow, /etc/group)?
+- `/etc/passwd`: user accounts, seven colon-separated fields: name, x (password placeholder), UID, GID, comment, home directory, shell.
+- `/etc/shadow`: hashed passwords and aging info (root only).
+- `/etc/group`: groups and members.
+- `/etc/sudoers` and `/etc/sudoers.d/`: sudo rules (edit with visudo).
+
+### How do I give a user sudo access to only some commands?
+Run `sudo visudo -f /etc/sudoers.d/alice` and add `alice ALL=(ALL) /usr/bin/systemctl restart nginx`. Add `NOPASSWD:` before the command list to skip the password prompt (use sparingly).
+
+### How do I force password expiry, lock, or unlock an account?
+`sudo chage -l alice` show aging, `sudo chage -M 90 alice` max 90 days, `sudo chage -d 0 alice` force change at next login, `sudo passwd -l alice` or `sudo usermod -L alice` lock, `sudo passwd -u alice` unlock, `sudo usermod -e 2026-12-31 alice` set expiry date.
+
+### How do I find who is logged in and their activity?
+`who`, `w`, `last -n 20`, `lastb` (failed logins, root), `lastlog`, `loginctl list-sessions`, `sudo journalctl -u ssh`, `/var/log/auth.log` (Debian/Ubuntu) or `/var/log/secure` (RHEL).
+
+### How do I make a shared directory for a group?
+```
+sudo groupadd project
+sudo usermod -aG project alice
+sudo mkdir /srv/project
+sudo chgrp project /srv/project
+sudo chmod 2775 /srv/project
+```
+The setgid bit (2) makes new files inherit the group. Users must log out and in for group changes.
+
+### What is the difference between su, sudo, and sudo -i?
+`su -` switches to root using the root password. `sudo command` runs one command as root using your own password (if allowed). `sudo -i` opens a root login shell. `sudo -u user command` runs as another user. sudo logs every use, so it is preferred.
+
+---
+
+## CATEGORY 7: NETWORKING IN DEPTH
+
+### What are IP addresses, subnets, ports, DNS, and gateways?
+- IP address identifies a host (IPv4 like 192.168.1.10, IPv6 like fe80::1).
+- Subnet mask or CIDR (192.168.1.0/24) defines the local network size.
+- Gateway (router) is where non-local traffic goes.
+- DNS translates names to IPs (config in `/etc/resolv.conf` or systemd-resolved).
+- Port identifies a service on a host (22 SSH, 80 HTTP, 443 HTTPS, 53 DNS, 3306 MySQL, 5432 PostgreSQL, 6379 Redis, 3000/8000/8080 dev servers).
+- Private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16.
+
+### How do I find my IP address?
+Private: `ip a` or `hostname -I`. Public: `curl ifconfig.me` or `curl -s https://api.ipify.org`. Default gateway: `ip route | grep default`.
+
+### How do I set a static IP or configure networking?
+Ubuntu (netplan): edit `/etc/netplan/*.yaml` with addresses, routes, nameservers, then `sudo netplan apply`. NetworkManager: `nmcli device status`, `nmcli connection show`, `nmcli connection modify NAME ipv4.addresses 192.168.1.50/24 ipv4.gateway 192.168.1.1 ipv4.dns 8.8.8.8 ipv4.method manual`, `nmcli connection up NAME`. Wi-Fi: `nmcli device wifi list`, `nmcli device wifi connect SSID password PASS`.
+
+### How do I troubleshoot "no internet" on Linux?
+1. `ip a` — do you have an IP on the interface?
+2. `ping -c 3 192.168.1.1` (your gateway) — local network works?
+3. `ping -c 3 8.8.8.8` — internet works without DNS?
+4. `ping -c 3 google.com` — DNS works? If not, check `/etc/resolv.conf` or `resolvectl status`.
+5. `ip route` — is there a default route?
+6. `sudo systemctl restart NetworkManager`.
+7. `sudo dmesg | grep -i eth` or `-i wlan` for driver issues.
+
+### What is /etc/hosts and /etc/resolv.conf?
+`/etc/hosts` maps names to IPs locally (checked before DNS), for example `127.0.0.1 myapp.local`. `/etc/resolv.conf` lists DNS servers (often managed by systemd-resolved; use `resolvectl status`).
+
+### How do I use netcat (nc) for testing ports?
+`nc -vz host 22` test if a port is open, `nc -l 9000` listen on a port, `echo "hi" | nc host 9000` send data. For HTTP debugging prefer curl.
+
+### How do I capture network packets with tcpdump?
+`sudo tcpdump -i any port 80`, `sudo tcpdump -i eth0 -n host 10.0.0.5`, `sudo tcpdump -w capture.pcap` save for Wireshark. Use `-c 100` to stop after 100 packets. Only capture traffic you are authorized to inspect.
+
+### How do I use firewalld, iptables, and nftables?
+- ufw (Ubuntu): `sudo ufw allow 22/tcp`, `sudo ufw enable`, `sudo ufw status verbose`.
+- firewalld (RHEL/Fedora): `sudo firewall-cmd --list-all`, `sudo firewall-cmd --permanent --add-service=http`, `sudo firewall-cmd --permanent --add-port=8080/tcp`, `sudo firewall-cmd --reload`.
+- iptables (legacy): `sudo iptables -L -n -v`, `sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT`.
+- nftables (modern): `sudo nft list ruleset`.
+Always allow SSH before enabling a firewall on a remote machine.
+
+### How do I set up SSH keys, config, tunnels, and hardening?
+- Keys: `ssh-keygen -t ed25519`, `ssh-copy-id user@host`.
+- Config `~/.ssh/config`:
+  ```
+  Host myserver
+      HostName 203.0.113.10
+      User ubuntu
+      IdentityFile ~/.ssh/id_ed25519
+      Port 22
+  ```
+  Then `ssh myserver`.
+- Local tunnel: `ssh -L 8080:localhost:80 user@host`. Remote tunnel: `ssh -R 9000:localhost:3000 user@host`. SOCKS proxy: `ssh -D 1080 user@host`.
+- Hardening in `/etc/ssh/sshd_config`: `PasswordAuthentication no`, `PermitRootLogin no`, `PubkeyAuthentication yes`, limit users with `AllowUsers`. Then `sudo sshd -t` to test and `sudo systemctl reload ssh`. Keep an existing session open while testing.
+- ssh-agent: `eval "$(ssh-agent -s)"`, `ssh-add ~/.ssh/id_ed25519`.
+- "Permission denied (publickey)" means key not accepted; check the key is in `~/.ssh/authorized_keys` on the server and permissions are 700 for ~/.ssh and 600 for authorized_keys.
+
+### How do I check which ports are open and which services listen?
+`sudo ss -tulpn`, `sudo lsof -i -P -n | grep LISTEN`, `nmap -p- localhost` (only on systems you own), and `sudo netstat -tulpn` on older systems.
+
+### How do I download files and call APIs with curl and wget?
+`curl -O URL`, `curl -L -o name URL`, `curl -H "Authorization: Bearer TOKEN" URL`, `curl -X POST -d '{"a":1}' -H "Content-Type: application/json" URL`, `curl -I URL` headers, `curl -u user:pass URL`, `curl --retry 3 URL`, `wget -c URL` resume, `wget -r -np -k URL` mirror a site.
+
+### What is a reverse proxy and how do I set up Nginx quickly?
+A reverse proxy receives requests and forwards them to an application. Install: `sudo apt install nginx`. Site config in `/etc/nginx/sites-available/app` linked into `sites-enabled`:
+```
+server {
+    listen 80;
+    server_name example.com;
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+    }
+}
+```
+Test `sudo nginx -t`, apply `sudo systemctl reload nginx`. HTTPS with Let's Encrypt: `sudo apt install certbot python3-certbot-nginx` then `sudo certbot --nginx -d example.com`.
+
+---
+
+## CATEGORY 8: STORAGE, LVM, RAID, AND FILESYSTEMS
+
+### What filesystem types does Linux use?
+ext4 (default on many distros, stable), xfs (RHEL default, large files), btrfs (snapshots, compression), zfs (via modules), vfat/exfat (USB sticks, Windows compatibility), ntfs (via ntfs-3g or kernel driver), tmpfs (RAM-based), nfs (network). Check with `df -T` or `lsblk -f`.
+
+### How do I partition, format, and mount a new disk?
+```
+lsblk                                  # identify the disk (for example /dev/sdb)
+sudo fdisk /dev/sdb                    # n (new), p, accept defaults, w (write)
+sudo mkfs.ext4 /dev/sdb1               # format
+sudo mkdir /data
+sudo mount /dev/sdb1 /data
+blkid /dev/sdb1                        # get UUID
+```
+Persist by adding to `/etc/fstab`: `UUID=xxxx /data ext4 defaults 0 2`, then test with `sudo mount -a`. Double check the device name: formatting the wrong disk destroys data.
+
+### How do I check and repair a filesystem?
+Unmount first: `sudo umount /dev/sdb1`, then `sudo fsck -f /dev/sdb1` (ext4) or `sudo xfs_repair /dev/sdb1` (xfs). Never run fsck on a mounted filesystem. Check SMART health: `sudo smartctl -a /dev/sda` (package smartmontools).
+
+### What is LVM and how do I use it?
+LVM (Logical Volume Manager) makes flexible volumes from physical disks. Layers: PV (physical volume) → VG (volume group) → LV (logical volume).
+```
+sudo pvcreate /dev/sdb /dev/sdc
+sudo vgcreate vg_data /dev/sdb /dev/sdc
+sudo lvcreate -L 50G -n lv_app vg_data
+sudo mkfs.ext4 /dev/vg_data/lv_app
+sudo lvextend -L +10G -r /dev/vg_data/lv_app     # grow volume and filesystem
+```
+Inspect with `pvs`, `vgs`, `lvs`.
+
+### What is RAID and how do I set up software RAID?
+RAID 0 stripes (speed, no redundancy), RAID 1 mirrors, RAID 5 striping with parity (needs 3+ disks), RAID 6 two parities, RAID 10 mirror plus stripe. Software RAID with mdadm: `sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sdb /dev/sdc`, check `cat /proc/mdstat`, `sudo mdadm --detail /dev/md0`. RAID is not a backup.
+
+### How do I mount network shares (NFS and SMB)?
+NFS: `sudo apt install nfs-common`, `sudo mount -t nfs server:/export /mnt/nfs`. SMB/CIFS: `sudo apt install cifs-utils`, `sudo mount -t cifs //server/share /mnt/share -o username=user`. Add to /etc/fstab with `_netdev` to avoid boot delays.
+
+### How do I mount an ISO file or a USB drive?
+`sudo mount -o loop file.iso /mnt/iso`, USB: find with `lsblk`, then `sudo mount /dev/sdb1 /mnt/usb`, unmount with `sudo umount /mnt/usb` before removing.
+
+### How do I resize a partition or grow a disk on a cloud VM?
+After enlarging the disk in the cloud console: `lsblk`, `sudo growpart /dev/xvda 1` (package cloud-guest-utils), then `sudo resize2fs /dev/xvda1` (ext4) or `sudo xfs_growfs /` (xfs).
+
+### What are inodes and how do I fix "No space left on device" when df shows free space?
+Each file uses one inode; you can run out of inodes with many small files. Check `df -i`. Find directories with many files: `sudo find / -xdev -type f | cut -d/ -f2 | sort | uniq -c | sort -n`. Delete unneeded small files (old sessions, caches, mail queues).
+
+### What is swap and how do I manage it?
+Swap is disk space used when RAM is full. `swapon --show`, `free -h`. Create a file swap: `sudo fallocate -l 4G /swapfile; sudo chmod 600 /swapfile; sudo mkswap /swapfile; sudo swapon /swapfile`, then add `/swapfile none swap sw 0 0` to /etc/fstab. Tune `vm.swappiness` (default 60; lower to use swap less): `sudo sysctl vm.swappiness=10`.
+
+### How do I back up and restore with tar, rsync, and dd?
+- tar: `sudo tar -czpf /backup/etc.tar.gz /etc`, restore `sudo tar -xzpf etc.tar.gz -C /`.
+- rsync incremental: `rsync -aAXv --delete /home/ /backup/home/`.
+- Disk image: `sudo dd if=/dev/sda of=/backup/disk.img bs=4M status=progress` (careful with `of=`).
+- Follow the 3-2-1 rule: 3 copies, 2 media, 1 offsite. Test restores.
+
+---
+
+## CATEGORY 9: PACKAGE MANAGEMENT IN DEPTH
+
+### How do I install software from source code?
+```
+tar -xzf app-1.0.tar.gz && cd app-1.0
+./configure --prefix=/usr/local
+make
+sudo make install
+```
+Install build tools first (`sudo apt install build-essential`). Prefer packages or containers when possible, since source installs are harder to uninstall (use `checkinstall` or a prefix under /opt).
+
+### How do I add and manage repositories and keys?
+Debian/Ubuntu: add a repo file in `/etc/apt/sources.list.d/`, import its key to `/etc/apt/keyrings/`, then `sudo apt update`. PPA: `sudo add-apt-repository ppa:name/ppa`. RHEL: add a `.repo` file in `/etc/yum.repos.d/`. Only add repositories you trust.
+
+### How do I hold, pin, or downgrade a package?
+`sudo apt-mark hold pkg` stops upgrades, `sudo apt-mark unhold pkg`, `apt list -a pkg` shows versions, `sudo apt install pkg=1.2.3-1`. RHEL: `sudo dnf downgrade pkg`, `sudo dnf versionlock add pkg`.
+
+### How do I find which package provides a command or file?
+Debian: `dpkg -S /usr/bin/ls`, `apt-file search filename`. RHEL: `dnf provides */filename`, `rpm -qf /path/file`. Arch: `pacman -Qo /path`.
+
+### How do I clean up disk space from packages?
+`sudo apt autoremove --purge`, `sudo apt clean`, `sudo dnf autoremove`, `sudo dnf clean all`, `sudo journalctl --vacuum-time=7d`, `sudo snap list --all` then remove old revisions, `docker system prune`.
+
+### What are snap, flatpak, and AppImage?
+Universal app formats. Snap (Canonical): `sudo snap install code --classic`. Flatpak: `flatpak install flathub org.app.Name`. AppImage: download, `chmod +x app.AppImage`, run it. They bundle dependencies and trade disk space for portability.
+
+### How do I fix broken packages and dependency errors?
+`sudo apt --fix-broken install`, `sudo dpkg --configure -a`, `sudo apt update`, `sudo apt full-upgrade`. For lock errors: wait for other apt processes (`ps aux | grep apt`). For GPG errors: re-import the repository key.
+
+### How do I use Python and pip safely on Linux?
+Use virtual environments: `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`. Use `pipx install tool` for command-line tools. Avoid `sudo pip` (it can break system packages). "externally-managed-environment" means use a venv or pipx.
+
+---
+
+## CATEGORY 10: LOGGING, MONITORING, AND PERFORMANCE
+
+### Where are the important log files?
+`/var/log/syslog` (Debian/Ubuntu general) or `/var/log/messages` (RHEL), `/var/log/auth.log` or `/var/log/secure` (logins and sudo), `/var/log/kern.log` and `dmesg` (kernel), `/var/log/dpkg.log` and `/var/log/apt/` (packages), `/var/log/nginx/access.log` and `error.log`, `/var/log/cron` or journal for cron, `/var/log/boot.log`, `/var/log/wtmp` (read with `last`). Use `journalctl` for systemd services.
+
+### How do I analyze logs quickly with grep, awk, and sort?
+- Count errors: `grep -c "ERROR" app.log`.
+- Top IPs in an Nginx log: `awk '{print $1}' access.log | sort | uniq -c | sort -nr | head`.
+- Errors in the last hour (journal): `journalctl --since "1 hour ago" -p err`.
+- Failed SSH logins: `grep "Failed password" /var/log/auth.log | awk '{print $(NF-3)}' | sort | uniq -c | sort -nr`.
+
+### What is logrotate and how do I configure it?
+logrotate rotates, compresses, and deletes old logs. Config in `/etc/logrotate.conf` and `/etc/logrotate.d/app`:
+```
+/var/log/app/*.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+}
+```
+Test: `sudo logrotate -d /etc/logrotate.d/app`.
+
+### How do I find what is using CPU, memory, or disk I/O?
+CPU/memory: `top` or `htop` (sort with P or M). Memory by process: `ps aux --sort=-%mem | head`. CPU: `ps aux --sort=-%cpu | head`. Disk I/O: `iostat -x 2`, `iotop -o` (sudo). Network usage: `iftop`, `nload`, `ss -s`. Overall: `vmstat 1`, `sar` (package sysstat), `uptime` for load average (compare to core count from `nproc`).
+
+### How do I understand load average?
+`uptime` shows load averages for 1, 5, 15 minutes: the average number of processes running or waiting. On a machine with N cores, a sustained load above N means the system is overloaded. High load with low CPU use often means disk I/O waits.
+
+### What is the OOM killer and how do I investigate "Killed"?
+When memory runs out the kernel kills a process. Check: `sudo dmesg -T | grep -i -E "killed process|out of memory"` or `journalctl -k | grep -i oom`. Fixes: add RAM or swap, limit the process's memory, fix memory leaks, use cgroups/systemd `MemoryMax=`.
+
+### How do I troubleshoot a slow Linux server?
+1. `uptime` and `top` for load and top processes.
+2. `free -h` for memory pressure and swapping (`vmstat 1` si/so columns).
+3. `df -h` and `df -i` for full disks.
+4. `iostat -x 1` for disk wait (`%util`, `await`).
+5. `ss -s` and `ss -tan state established | wc -l` for connection counts.
+6. `journalctl -p err -b` and `dmesg -T | tail` for errors.
+7. Check recent changes (deployments, cron jobs, package updates).
+
+### How do I set up basic monitoring and alerts?
+Quick tools: htop, glances, netdata, btop. Production: Prometheus with node_exporter plus Grafana, or Zabbix, Nagios, Datadog. Use `cron` with scripts for simple threshold alerts, and systemd `OnFailure=` for service failure notifications.
+
+### What are cgroups and namespaces (containers basics)?
+Cgroups limit and account resources (CPU, memory, I/O) for groups of processes. Namespaces isolate views of the system (process IDs, network, mounts, users, hostname). Containers like Docker combine both. Check with `systemd-cgls` and `systemd-cgtop`.
+
+---
+
+## CATEGORY 11: SYSTEMD, CRON, AND SCHEDULING IN DEPTH
+
+### How do I create a systemd service for my app?
+Create `/etc/systemd/system/myapp.service`:
+```
+[Unit]
+Description=My App
+After=network.target
+
+[Service]
+User=appuser
+WorkingDirectory=/opt/myapp
+ExecStart=/opt/myapp/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+Environment=PORT=8000
+EnvironmentFile=/etc/myapp.env
+
+[Install]
+WantedBy=multi-user.target
+```
+Then `sudo systemctl daemon-reload`, `sudo systemctl enable --now myapp`, `systemctl status myapp`, `journalctl -u myapp -f`.
+
+### How do I use systemd timers instead of cron?
+Create `backup.service` (the job) and `backup.timer`:
+```
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+Enable with `sudo systemctl enable --now backup.timer`, list with `systemctl list-timers`.
+
+### How do I read and fix a failed systemd service?
+`systemctl status service` shows the last lines and exit code, `journalctl -u service -b --no-pager | tail -50`, `systemctl cat service` shows the unit file, `systemd-analyze verify service`. Common causes: wrong ExecStart path, missing permissions or user, port in use, missing environment file, syntax errors in the unit. After edits run `sudo systemctl daemon-reload`. If it restarts too fast: `systemctl reset-failed service`.
+
+### How does the crontab format work and what are common pitfalls?
+Five time fields then the command: `minute(0-59) hour(0-23) day-of-month(1-31) month(1-12) day-of-week(0-7, 0 and 7 = Sunday)`. Special strings: `@reboot`, `@daily`, `@hourly`, `@weekly`. Pitfalls: cron has a minimal PATH (use absolute paths), runs in a non-interactive shell (no ~/.bashrc), percent signs need escaping (`\%`), and time zone is the server's. System-wide cron files: `/etc/crontab`, `/etc/cron.d/`, `/etc/cron.daily/`. Logs: `grep CRON /var/log/syslog`.
+
+---
+
+## CATEGORY 12: SECURITY AND HARDENING
+
+### What are basic steps to secure a Linux server?
+1. Keep it updated (`sudo apt update && sudo apt upgrade`, enable unattended-upgrades).
+2. Use SSH keys, disable password login and root login.
+3. Enable a firewall (ufw or firewalld) and open only needed ports.
+4. Use non-root users with sudo.
+5. Install fail2ban to block brute-force attempts.
+6. Remove unneeded services and packages.
+7. Set strong file permissions; avoid 777.
+8. Monitor logs and use intrusion detection (auditd, AIDE).
+9. Back up data and test restores.
+10. Use TLS (Let's Encrypt) for web services.
+
+### How do I install and use fail2ban?
+`sudo apt install fail2ban`, copy defaults `sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local`, enable `[sshd]` with `enabled = true`, `maxretry = 5`, `bantime = 1h`. Start with `sudo systemctl enable --now fail2ban`. Check with `sudo fail2ban-client status sshd`. Unban with `sudo fail2ban-client set sshd unbanip 1.2.3.4`.
+
+### What is SELinux and AppArmor?
+Mandatory access control systems that restrict what processes can do even if running as root. SELinux (RHEL, Fedora): `getenforce`, `sudo setenforce 0` (permissive, temporary), config `/etc/selinux/config`, check denials with `sudo ausearch -m avc -ts recent`, fix file contexts with `sudo restorecon -Rv /path` and booleans with `setsebool -P`. Do not simply disable it; fix the policy. AppArmor (Ubuntu, Debian, SUSE): `sudo aa-status`, profiles in `/etc/apparmor.d/`, `sudo aa-complain /path/profile`.
+
+### How do I find files with dangerous permissions or setuid bits?
+World-writable: `find / -xdev -type f -perm -0002 2>/dev/null`. Setuid: `find / -xdev -perm -4000 -type f 2>/dev/null`. Files with no owner: `find / -xdev -nouser -o -nogroup 2>/dev/null`. Review results carefully before changing anything.
+
+### How do I encrypt files and use GPG?
+`gpg --full-generate-key` creates a key pair. Encrypt for a recipient `gpg -e -r email file`, decrypt `gpg -d file.gpg > file`, symmetric (password) `gpg -c file`, sign `gpg --sign file`, list keys `gpg --list-keys`. Disk encryption: LUKS with `cryptsetup luksFormat /dev/sdb1` (destroys existing data) then `cryptsetup open`.
+
+### How do I audit what changed on a system?
+`sudo apt install auditd`, rules with `auditctl -w /etc/passwd -p wa -k passwd_changes`, search with `ausearch -k passwd_changes`. For package integrity: `debsums -c` (Debian) or `rpm -Va` (RHEL). Review `last`, `lastb`, and `/var/log/auth.log`.
+
+### What should I do if I think my Linux server was compromised?
+Isolate it from the network if possible, preserve evidence (do not reboot or wipe immediately), check `last`, `who`, `ps aux`, `ss -tulpn`, cron jobs for all users (`for u in $(cut -f1 -d: /etc/passwd); do crontab -l -u $u 2>/dev/null; done`), recently changed files (`find / -mtime -2 -type f 2>/dev/null`), and unfamiliar SSH keys in `authorized_keys`. Rotate all credentials and keys, then rebuild from a clean image and restore data from known-good backups.
+
+---
+
+## CATEGORY 13: DOCKER AND CONTAINERS ON LINUX
+
+### What is Docker and what are images and containers?
+Docker packages an application and its dependencies into an image; a running instance is a container. Containers share the host kernel but are isolated with namespaces and cgroups, so they start fast and use fewer resources than virtual machines.
+
+### How do I install Docker on Ubuntu?
+Use the official repository method from docs.docker.com, or quickly `sudo apt install docker.io`. Then `sudo systemctl enable --now docker`, and to run without sudo `sudo usermod -aG docker $USER` and log out and in. Test with `docker run hello-world`.
+
+### What are the essential Docker commands?
+- `docker ps` running containers, `docker ps -a` all.
+- `docker images` list images, `docker pull ubuntu:24.04` download.
+- `docker run -it ubuntu bash` interactive container, `docker run -d -p 8080:80 --name web nginx` detached with port mapping.
+- `docker exec -it web bash` shell into a running container.
+- `docker logs -f web` follow logs.
+- `docker stop web`, `docker start web`, `docker restart web`, `docker rm web`, `docker rmi image`.
+- `docker build -t myapp .` build from a Dockerfile.
+- `docker volume ls`, `docker network ls`.
+- `docker system prune` remove unused data (check what it removes first).
+- `docker compose up -d`, `docker compose down`, `docker compose logs -f`.
+
+### How do I write a basic Dockerfile?
+```
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["python", "app.py"]
+```
+Build `docker build -t myapp .`, run `docker run -p 8000:8000 myapp`.
+
+### What is docker compose?
+A YAML file `compose.yaml` that defines multi-container apps:
+```
+services:
+  web:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db]
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: example
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+volumes:
+  dbdata:
+```
+Run `docker compose up -d`.
+
+### How do I fix common Docker problems on Linux?
+"permission denied /var/run/docker.sock": add user to docker group and re-login. "port is already allocated": another process uses the port (`ss -tulpn | grep :PORT`). Disk full: `docker system df` then `docker system prune -a --volumes` (removes unused data). Container exits immediately: `docker logs name` and check the CMD. Cannot reach host service: use `host.docker.internal` or the bridge IP.
+
+---
+
+## CATEGORY 14: LINUX FOR DEVELOPERS AND AI/ML WORK
+
+### How do I set up a Python development environment on Linux?
+`sudo apt update && sudo apt install python3 python3-venv python3-pip build-essential git`. Create a project: `mkdir proj && cd proj && python3 -m venv .venv && source .venv/bin/activate`. Install packages with pip, freeze with `pip freeze > requirements.txt`. Use `pyenv` to manage several Python versions.
+
+### How do I check GPU and CUDA status on Linux?
+`nvidia-smi` shows driver, CUDA version, GPU memory and processes, `watch -n 1 nvidia-smi` live view, `lspci | grep -i nvidia` detects the card, `nvcc --version` shows the CUDA toolkit. Install drivers with `sudo ubuntu-drivers autoinstall` on Ubuntu. In Python check `torch.cuda.is_available()`.
+
+### How do I run long training jobs that survive logout?
+Use tmux (`tmux new -s train`, detach with Ctrl+b d, reattach `tmux attach -t train`), or `nohup python train.py > train.log 2>&1 &`, then `tail -f train.log`. For servers use a systemd service or a job scheduler (Slurm).
+
+### How do I work with environment variables and .env files?
+`export API_KEY=value` for the session, or keep `.env` (never commit it) and load with `set -a; source .env; set +a` or python-dotenv. Check with `printenv API_KEY`.
+
+### How do I use screen and tmux effectively?
+tmux: `Ctrl+b c` new window, `Ctrl+b n/p` next/previous, `Ctrl+b %` split vertical, `Ctrl+b "` split horizontal, `Ctrl+b [` scroll mode (q to exit), `tmux kill-session -t name`. screen: `screen -S name`, detach `Ctrl+a d`, `screen -r name`.
+
+### How do I transfer large datasets and models between machines?
+`rsync -avzP --partial data/ user@host:/data/` (resumable), `scp -r folder user@host:/path/`, `wget -c URL`, `curl -C - -O URL`, cloud tools (`aws s3 sync`, `gsutil -m rsync`, `rclone`). Verify with `sha256sum`.
+
+### How do I manage CPU, memory and file descriptors for apps?
+`nproc` number of cores, `lscpu`, `free -h`, `ulimit -n` open files, `taskset -c 0-3 command` pin to CPUs, `nice -n 10 command` lower priority, `systemd-run --scope -p MemoryMax=2G command` limit memory.
+
+---
+
+## CATEGORY 15: LINUX INTERVIEW QUESTIONS AND SHORT ANSWERS
+
+### What is the difference between a hard link and a soft link?
+A hard link is another name for the same inode (same data); deleting one name leaves the data. It cannot cross filesystems or point to directories. A soft (symbolic) link is a separate file that stores a path; it breaks if the target is removed and can point anywhere.
+
+### What is the difference between a process and a thread?
+A process is a running program with its own memory space and PID. Threads are lightweight units of execution inside a process that share its memory. View threads with `ps -eLf` or `top -H`.
+
+### What is a zombie process and how do I deal with it?
+A zombie is a finished process whose parent has not yet read its exit status; it shows as `Z` or `<defunct>` in ps and uses no resources except a process table entry. Killing it does nothing; fix or restart the parent (or wait for the parent to call wait). `ps aux | awk '$8=="Z"'`.
+
+### What is an orphan process and a daemon?
+An orphan's parent exited; it is adopted by PID 1 (init/systemd). A daemon is a long-running background service process (sshd, nginx, cron).
+
+### What is the difference between `>` and `>>`, and between `|` and `;`?
+`>` overwrites a file, `>>` appends. `|` pipes output of one command into the next, `;` just runs commands one after another.
+
+### What is the difference between `cron` and `at`?
+cron runs jobs repeatedly on a schedule. `at` runs a job once at a specific time.
+
+### What is the difference between `kill`, `kill -9`, and `killall`?
+`kill PID` sends SIGTERM (graceful stop). `kill -9 PID` sends SIGKILL (immediate, cannot be handled, no cleanup). `killall name` and `pkill pattern` kill by name.
+
+### What is the difference between `apt update` and `apt upgrade`?
+`apt update` refreshes the list of available packages and versions. `apt upgrade` installs newer versions of installed packages. `apt full-upgrade` also adds or removes packages when needed to complete the upgrade.
+
+### What is the difference between `/bin`, `/usr/bin`, and `/usr/local/bin`?
+`/bin` essential commands (often a symlink to /usr/bin now), `/usr/bin` most user commands installed by the package manager, `/usr/local/bin` software installed manually by the administrator (not touched by the package manager).
+
+### What is sticky bit, setuid, and setgid?
+Sticky bit on a directory (like /tmp) lets users delete only their own files. setuid makes an executable run with its owner's privileges (for example passwd). setgid makes it run with the group's privileges or makes new files in a directory inherit its group.
+
+### What happens when you type a command and press Enter?
+The shell parses the line, expands variables and globs, checks for aliases and built-ins, searches PATH for the executable, forks a new process, executes the program with exec, connects stdin/stdout/stderr, waits for it to finish, and stores the exit status in `$?`.
+
+### How do you check which process is using a port?
+`sudo ss -tulpn | grep :PORT` or `sudo lsof -i :PORT`.
+
+### How do you find and kill all processes of a user?
+`pgrep -u username`, then `sudo pkill -u username` (use `-9` only if needed).
+
+### How do you check if a server is reachable and a service is up?
+`ping host` (network), `nc -vz host port` or `curl -I http://host` (service), `systemctl status service` (on the host).
+
+### What does `chmod 755` mean and what is `umask 022`?
+755 = owner rwx, group r-x, others r-x. umask 022 removes write permission for group and others from new files, giving 644 for files and 755 for directories.
+
+### How do you make a command run at startup?
+Create a systemd service and `systemctl enable` it, or add a cron `@reboot` entry, or use `/etc/rc.local` on older systems.
+
+### How do you recover a deleted file in Linux?
+There is no trash for `rm`. Check desktop trash (`~/.local/share/Trash`), restore from backup, or use recovery tools (extundelete for ext3/4, testdisk/photorec) immediately after unmounting or stopping writes to the disk. Prevention: use `rm -i` or `trash-cli`, and keep backups.
+
+---
+
+## CATEGORY 16: A TO Z COMMAND INDEX (QUICK LOOKUP)
+
+### Linux commands A to C
+alias (create shortcut), apt (Debian package manager), apropos (search man pages), ar (archive), at (one-time schedule), awk (text processing), basename (strip path), bash (shell), bc (calculator), bg (resume job in background), bzip2 (compress), cal (calendar), cat (show file), cd (change directory), chattr (file attributes), chgrp (change group), chmod (permissions), chown (owner), chsh (change shell), clear (clear screen), cmp (compare bytes), column (format columns), comm (compare sorted files), cp (copy), cron (scheduler), crontab (edit schedule), curl (transfer data), cut (extract columns).
+
+### Linux commands D to F
+date (date and time), dd (low-level copy), df (disk free), diff (compare files), dig (DNS), dirname (directory part), dmesg (kernel messages), dnf (RHEL package manager), docker (containers), du (disk usage), echo (print text), env (environment), exit (leave shell), export (set variable), expr (evaluate), fdisk (partition), fg (resume job in foreground), file (file type), find (search files), flock (lock), fold (wrap lines), free (memory), fsck (check filesystem), ftp/sftp (file transfer).
+
+### Linux commands G to L
+gcc (C compiler), getfacl (show ACL), git (version control), grep (search text), groupadd (new group), groups (list groups), gunzip/gzip (compress), head (first lines), hexdump (hex view), history (past commands), host (DNS), hostname (name), hostnamectl (set name), htop (monitor), id (user ids), ifconfig (old network info), ip (network), iptables (firewall), jobs (list jobs), journalctl (logs), kill (signal), killall (kill by name), last (login history), ldd (shared libraries), less (pager), ln (links), locate (find by name), logger (write to syslog), ls (list), lsblk (block devices), lscpu (CPU info), lsmod (modules), lsof (open files), lspci (PCI devices), lsusb (USB devices).
+
+### Linux commands M to P
+make (build), man (manual), md5sum (checksum), mkdir (new directory), mkfs (format), mkswap (swap), more (pager), mount (attach filesystem), mv (move), nano (editor), nc (netcat), netstat (network stats), nice (priority), nl (number lines), nmap (scan), nmcli (NetworkManager), nohup (survive logout), nslookup (DNS), openssl (crypto), parted (partition), passwd (password), paste (merge lines), ping (connectivity), pip (Python packages), pkill (kill by pattern), printenv (variables), ps (processes), pstree (process tree), pwd (current directory).
+
+### Linux commands R to S
+read (input in script), readlink (resolve link), realpath (absolute path), reboot (restart), rename (bulk rename), renice (priority), rev (reverse text), rm (delete), rmdir (delete empty dir), rpm (RHEL packages), rsync (sync files), scp (secure copy), screen (sessions), sed (stream editor), seq (numbers), service (legacy service control), set (shell settings), setfacl (set ACL), sh (shell), shred (overwrite), shutdown (power off), sleep (wait), snap (snap packages), sort (sort lines), source (run script in current shell), split (split files), ss (sockets), ssh (remote login), ssh-keygen (keys), stat (file details), strace (trace calls), su (switch user), sudo (run as admin), swapon (enable swap), sysctl (kernel parameters), systemctl (services).
+
+### Linux commands T to Z
+tac (reverse lines), tail (last lines), tar (archive), tcpdump (packet capture), tee (split output), time (timing), timeout (limit runtime), tmux (terminal multiplexer), top (processes), touch (create file), tr (translate characters), traceroute (network path), tree (directory tree), type (command type), uname (system info), uniq (unique lines), unzip (extract zip), uptime (load), useradd (new user), userdel (remove user), usermod (modify user), vi/vim (editors), visudo (edit sudoers), watch (repeat command), wc (count), wget (download), whatis (short description), whereis (locate binary), which (command path), who (logged users), whoami (current user), xargs (build commands), yes (repeat), zip (compress), zless/zcat (view compressed files).
+
+---
+
+## CATEGORY 17: LINUX TROUBLESHOOTING PLAYBOOK
+
+### Linux command not working: general checklist
+1. Read the error message carefully, copy it exactly.
+2. `which command` and `type command` to see if it exists.
+3. `command --help` or `man command`.
+4. Check permissions (`ls -l`) and ownership.
+5. Check disk space (`df -h`), memory (`free -h`).
+6. Check logs (`journalctl -xe`, `/var/log/`).
+7. Search the exact error string online, and note your distro and version.
+
+### "sudo: command not found" or user is not in sudoers
+Cause: sudo not installed or user lacks rights. Fix as root: `apt install sudo` and `usermod -aG sudo username` (Debian/Ubuntu) or `usermod -aG wheel username` (RHEL). Log out and in.
+
+### "bash: ./script.sh: Permission denied" or "bad interpreter"
+`chmod +x script.sh`. If it says `/bin/bash^M: bad interpreter`, remove Windows line endings: `sed -i 's/\r$//' script.sh` or `dos2unix script.sh`. If the shebang path is wrong, fix the first line (`#!/usr/bin/env bash`).
+
+### "Read-only file system"
+The filesystem was remounted read-only, often after disk errors. Check `dmesg | tail`, `mount | grep ' ro'`. Try `sudo mount -o remount,rw /`. If errors persist run fsck from rescue mode and check disk health with smartctl.
+
+### "Too many open files"
+Raise limits: `ulimit -n 65535` for the session, and in `/etc/security/limits.conf` add `* soft nofile 65535` and `* hard nofile 65535`. For systemd services set `LimitNOFILE=65535` in the unit.
+
+### "Resource temporarily unavailable" or "fork: retry: Resource temporarily unavailable"
+Process or thread limit reached. Check `ulimit -u`, `ps -eLf | wc -l`, and find runaway processes with `ps aux --sort=-%cpu | head`.
+
+### System clock or time zone is wrong
+`timedatectl` shows status, `sudo timedatectl set-timezone Asia/Kolkata`, `sudo timedatectl set-ntp true` to sync automatically. Dual boot with Windows may shift time; set Windows to use UTC or set Linux `timedatectl set-local-rtc 1`.
+
+### Terminal shows garbled output or is stuck
+Type `reset` and Enter, or `stty sane`. If frozen after Ctrl+S, press Ctrl+Q (it resumes output).
+
+### Locale or encoding problems (weird characters)
+Check `locale`. Generate and set UTF-8: `sudo locale-gen en_US.UTF-8`, `sudo update-locale LANG=en_US.UTF-8`, and ensure your terminal uses UTF-8.
+
+### Cannot connect via SSH
+1. From the client: `ssh -vvv user@host` to see where it fails.
+2. "Connection refused": sshd is not running or wrong port (`sudo systemctl status ssh`, `ss -tlnp | grep :22`).
+3. "Connection timed out": firewall or wrong IP (check ufw, security groups, `ping`).
+4. "Permission denied (publickey)": key not authorized (permissions on ~/.ssh and authorized_keys, `ssh -i key`).
+5. "Host key verification failed": `ssh-keygen -R host` after confirming the change is legitimate.
+
+### Linux will not boot
+Boot a live USB, check disks (`lsblk`), run `fsck` on the root partition, check `/etc/fstab` for bad entries (comment them out), reinstall GRUB (`grub-install` and `update-grub` from a chroot), check free space on `/`. Use `journalctl -b -1` after booting to see the previous failed boot.
+
+### Display or graphics problems on Linux
+Check drivers: `lspci -k | grep -A3 -i vga`, install proprietary NVIDIA drivers with `ubuntu-drivers`, switch between Wayland and X11 at the login screen, check logs in `journalctl -b | grep -i -E "gpu|drm|nvidia"`.
+
+### Audio, Wi-Fi, or Bluetooth not working
+Audio: `pactl info`, restart PipeWire/PulseAudio (`systemctl --user restart pipewire pipewire-pulse`), check mixer with `alsamixer`. Wi-Fi: `rfkill list` (unblock with `rfkill unblock wifi`), `nmcli device wifi list`, check firmware with `dmesg | grep -i firmware`. Bluetooth: `bluetoothctl`, then `power on`, `scan on`, `pair MAC`, `connect MAC`.

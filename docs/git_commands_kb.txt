@@ -1,0 +1,656 @@
+# Git Extended Knowledge Base (Concepts, Internals, GitHub, Workflows, Advanced Commands, Troubleshooting)
+
+Format note for RAG: every entry starts with a `###` heading and is self-contained. Split chunks on `###` headings and keep the `##` category as metadata. This file complements git_commands_kb.txt.
+
+---
+
+## CATEGORY 1: GIT AND VERSION CONTROL CONCEPTS
+
+### What is Git?
+Git is a free, open-source distributed version control system created by Linus Torvalds in 2005 (originally for the Linux kernel). It tracks changes to files over time so you can see history, undo mistakes, work on features in parallel using branches, and collaborate with others. Every clone of a repository contains the full history, so most operations work offline and are fast.
+
+### What is version control and why use it?
+Version control records changes to files so you can recall earlier versions. Benefits: history of who changed what and why, easy undo, safe experiments in branches, collaboration without overwriting each other's work, backups on remote servers, code review through pull requests, and release tagging. Types: local (RCS), centralized (SVN, CVS, Perforce), and distributed (Git, Mercurial).
+
+### What is the difference between Git and GitHub?
+Git is the version control tool that runs on your computer. GitHub is a website and service that hosts Git repositories and adds collaboration features: pull requests, issues, code review, Actions (CI/CD), Pages, Projects, Codespaces, and permissions. Alternatives to GitHub: GitLab, Bitbucket, Azure DevOps, Gitea, Codeberg. You can use Git without GitHub.
+
+### What is a repository (repo)?
+A repository is a project folder tracked by Git. It contains your files and a hidden `.git` directory holding the entire history and configuration. A local repository lives on your machine; a remote repository lives on a server such as GitHub. A bare repository has no working files and is used as a central server copy.
+
+### What are the three states of a file in Git?
+- Modified: changed in the working directory but not yet staged.
+- Staged: marked in the index (staging area) to go into the next commit.
+- Committed: safely stored in the local repository history.
+Flow: working directory → `git add` → staging area → `git commit` → repository → `git push` → remote.
+
+### What is a commit?
+A commit is a snapshot of the whole project at one moment, identified by a unique SHA-1 hash (for example `3f2a1b9...`; newer repositories may use SHA-256). It stores the author, date, message, a pointer to the project tree, and a pointer to its parent commit(s). Commits form a chain (a directed acyclic graph) that is the repository's history.
+
+### What is a branch in Git?
+A branch is a lightweight movable pointer to a commit. Creating a branch only creates a small file with a commit hash, so branches are cheap. The default branch is usually `main` (older repositories use `master`). Branches let you develop features or fixes in isolation and merge them later.
+
+### What is HEAD in Git?
+HEAD is a pointer to the commit or branch you currently have checked out. Normally HEAD points to a branch name (like main), which points to its latest commit. In detached HEAD state it points directly to a commit. `HEAD~1` is the parent, `HEAD~2` the grandparent, `HEAD^2` the second parent of a merge commit. The file `.git/HEAD` stores it.
+
+### What is the staging area (index)?
+The staging area is a preparation zone where you choose exactly what goes into the next commit. It allows you to commit part of your changes (`git add -p`) and keep commits focused. Inspect it with `git status` and `git diff --staged`.
+
+### What is a remote and what is origin?
+A remote is a named reference to another copy of the repository, usually on a server. `origin` is the default name given to the remote you cloned from. `upstream` is commonly used for the original repository when you work from a fork. List with `git remote -v`.
+
+### What is a tag in Git?
+A tag is a permanent human-readable name for a specific commit, typically used to mark releases (v1.0.0). Lightweight tags are plain pointers; annotated tags store a message, tagger, and date and are recommended for releases.
+
+### What is a fork, clone, and pull request?
+- Clone: copy a repository to your computer (`git clone`).
+- Fork: a copy of someone else's repository on GitHub under your account, used to propose changes to projects you do not own.
+- Pull request (PR; called merge request on GitLab): a request to merge your branch into another branch, with discussion, review, and automated checks.
+
+### What is a merge, rebase, and fast-forward?
+- Merge combines two branches; if histories diverged Git creates a merge commit with two parents.
+- Fast-forward moves a branch pointer forward when there is no divergence, with no merge commit.
+- Rebase re-applies your commits on top of another branch tip to create a linear history, rewriting commit hashes.
+
+### What is the difference between Git snapshots and diffs?
+Git stores snapshots of the full project at each commit (efficiently, reusing unchanged file objects) and computes differences on demand. Other older systems stored a list of file changes (deltas). This is why branching and switching are fast in Git.
+
+### How does Git store data internally? (objects)
+Git is a content-addressable store inside `.git/objects`. Four object types: blob (file contents), tree (a directory listing of blobs and trees), commit (points to a tree, parent commits, author, message), and tag (annotated tag). Each object is named by the hash of its content. Branches and tags are just files in `.git/refs/` containing a commit hash. Inspect with `git cat-file -p <hash>` and `git cat-file -t <hash>`.
+
+### What is inside the .git folder?
+`HEAD` (current branch), `config` (repo settings), `objects/` (all data), `refs/` (branches and tags), `index` (staging area), `hooks/` (scripts), `logs/` (reflog), `info/exclude` (local ignore rules), `packed-refs`, `COMMIT_EDITMSG`. Never edit these by hand unless you know what you are doing. Deleting `.git` removes the entire history.
+
+### What is the difference between tracked, untracked, and ignored files?
+Tracked files are known to Git (in the last commit or index). Untracked files are new files Git has not been told about. Ignored files match patterns in `.gitignore` and are not shown or added. See them with `git status --ignored`.
+
+### What is a detached HEAD?
+It means HEAD points directly to a commit rather than a branch, for example after `git checkout <hash>` or `git checkout v1.0`. New commits made there are not on any branch and can be lost. Save them with `git switch -c new-branch`.
+
+### What is the difference between local and remote branches, and what is origin/main?
+`main` is your local branch. `origin/main` is a remote-tracking branch: your local record of where `main` was on the remote at your last fetch. `git fetch` updates `origin/main`; `git pull` fetches then merges it into your current branch.
+
+### What is a commit hash and can I use a short version?
+The hash identifies a commit. The first 7 or more characters are enough if unique (`git show 3f2a1b9`). Names like `HEAD`, `main`, `v1.0`, `HEAD~3`, `main@{yesterday}` also refer to commits.
+
+### What is semantic versioning and why tag releases?
+Semantic versioning uses MAJOR.MINOR.PATCH: increase MAJOR for breaking changes, MINOR for backward-compatible features, PATCH for bug fixes (for example 2.4.1). Tagging releases (`git tag -a v2.4.1 -m "msg"`) lets you rebuild or roll back to an exact version.
+
+---
+
+## CATEGORY 2: GETTING STARTED STEP BY STEP
+
+### How do I install Git?
+Windows: download Git for Windows from git-scm.com (includes Git Bash) or `winget install Git.Git`. macOS: `xcode-select --install` or `brew install git`. Ubuntu/Debian: `sudo apt install git`. Fedora/RHEL: `sudo dnf install git`. Check with `git --version`.
+
+### How do I configure Git for the first time?
+```
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+git config --global init.defaultBranch main
+git config --global core.editor "code --wait"
+git config --list
+```
+Use the same email as your GitHub account so commits are linked to your profile.
+
+### How do I create my first repository and commit?
+```
+mkdir my-project && cd my-project
+git init -b main
+echo "# My Project" > README.md
+git add README.md
+git commit -m "Add README"
+git log --oneline
+```
+
+### How do I connect a local repository to GitHub and push it?
+1. Create an empty repository on GitHub (no README if you already have local commits).
+2. In your project: `git remote add origin https://github.com/USERNAME/REPO.git`.
+3. `git branch -M main`.
+4. `git push -u origin main`.
+When asked for a password use a Personal Access Token (or sign in via the browser/Git Credential Manager), or use an SSH URL.
+
+### How do I clone a repository and start working?
+```
+git clone https://github.com/USER/REPO.git
+cd REPO
+git switch -c feature/my-change
+# edit files
+git add .
+git commit -m "Describe the change"
+git push -u origin feature/my-change
+```
+Then open a Pull Request on GitHub.
+
+### What is the basic daily Git workflow?
+`git status` → edit → `git diff` → `git add` → `git commit -m "msg"` → `git pull --rebase` (get others' work) → `git push`. Commit small, logical changes often.
+
+### How do I create a Personal Access Token (PAT) for GitHub?
+On GitHub: Settings → Developer settings → Personal access tokens → Fine-grained tokens (or classic) → Generate new token, choose repository access and scopes (for pushes: repository contents read/write; classic: `repo`). Copy it immediately; use it as the password when Git asks over HTTPS. Never commit tokens to repositories.
+
+### How do I set up SSH authentication for GitHub step by step?
+1. `ssh-keygen -t ed25519 -C "you@example.com"` (press Enter for defaults).
+2. Start the agent and add the key: `eval "$(ssh-agent -s)"` then `ssh-add ~/.ssh/id_ed25519` (on Windows PowerShell start the ssh-agent service first).
+3. Copy the public key: `cat ~/.ssh/id_ed25519.pub`.
+4. GitHub → Settings → SSH and GPG keys → New SSH key → paste.
+5. Test: `ssh -T git@github.com` should greet you by username.
+6. Use SSH URLs: `git remote set-url origin git@github.com:USER/REPO.git`.
+
+### How do I use Git on Windows (Git Bash, PowerShell, VS Code)?
+Git for Windows provides Git Bash and works in PowerShell and cmd. VS Code has a built-in Source Control panel: stage with +, commit with the message box, sync with the sync button. Configure line endings with `git config --global core.autocrlf true`. For Linux-style paths and tools use Git Bash or WSL.
+
+### How do I use Git with VS Code?
+Open the folder, use the Source Control icon (Ctrl+Shift+G) to see changes, stage (+), write a message and commit, push/pull from the "..." menu or status bar. Extensions such as GitLens show blame and history. Resolve conflicts with the built-in merge editor (Accept Current, Incoming, Both).
+
+---
+
+## CATEGORY 3: GITHUB FEATURES AND COLLABORATION
+
+### How do I create and review a pull request on GitHub?
+Push your branch, then click "Compare & pull request" on GitHub, choose base (target) and compare (your branch), write a clear title and description (what and why, link issues with `Fixes #12`), request reviewers, and wait for checks. Reviewers can comment, request changes, or approve. Merge with Merge commit, Squash and merge, or Rebase and merge, then delete the branch.
+
+### What are GitHub issues, labels, milestones, and projects?
+Issues track bugs, tasks, and ideas. Labels categorize them (bug, enhancement, good first issue), milestones group issues toward a release, and Projects give kanban boards and tables. Referencing `#123` in a commit or PR links to the issue; `Fixes #123` closes it when merged.
+
+### What is GitHub Actions?
+GitHub Actions is built-in CI/CD automation. Workflows are YAML files in `.github/workflows/`. Example that runs tests on every push and pull request:
+```
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest
+```
+Store secrets in repository Settings → Secrets and variables → Actions, and use `${{ secrets.NAME }}`.
+
+### What are branch protection rules and CODEOWNERS?
+Branch protection (Settings → Branches or Rulesets) can require pull requests, approvals, passing status checks, signed commits, linear history, and block force pushes and deletion of `main`. A `CODEOWNERS` file (in `.github/`) assigns automatic reviewers by path: `*.py @alice` or `/docs/ @docs-team`.
+
+### What is GitHub Pages?
+A free static website hosting service from a repository. Enable in Settings → Pages, choose a branch and folder (or use a GitHub Actions deployment). The site is available at `https://USERNAME.github.io/REPO/`.
+
+### What is the GitHub CLI (gh) and how do I use it?
+`gh` is the official command-line tool for GitHub. Install from cli.github.com. Commands: `gh auth login`, `gh repo create name --public --source=. --push`, `gh repo clone USER/REPO`, `gh pr create --fill`, `gh pr list`, `gh pr checkout 123`, `gh pr merge 123 --squash`, `gh issue create`, `gh issue list`, `gh run list` (Actions runs), `gh release create v1.0.0`.
+
+### How do I contribute to an open source project?
+1. Read README, CONTRIBUTING.md, and look for `good first issue` labels.
+2. Fork the repository and clone your fork.
+3. `git remote add upstream <original-url>`.
+4. Create a branch for your change.
+5. Make small, well-tested commits following project style.
+6. `git fetch upstream` and rebase or merge `upstream/main`.
+7. Push to your fork and open a pull request linking the issue.
+8. Respond to review comments by pushing more commits.
+
+### How do I keep my fork up to date with the original repository?
+```
+git remote add upstream https://github.com/ORIGINAL/REPO.git
+git fetch upstream
+git switch main
+git merge upstream/main     # or: git rebase upstream/main
+git push origin main
+```
+On GitHub you can also click "Sync fork".
+
+### How do I handle a pull request with merge conflicts on GitHub?
+Update your branch: `git fetch origin`, `git switch your-branch`, `git merge origin/main` (or `git rebase origin/main`), resolve conflicted files, `git add` them, finish the merge or `git rebase --continue`, test, and push. The PR updates automatically.
+
+### What is a GitHub release and how do I create one?
+A release packages a tag with notes and downloadable files. Create the tag (`git tag -a v1.0.0 -m "Release 1.0.0"` and `git push origin v1.0.0`), then GitHub → Releases → Draft a new release, pick the tag, write notes (or auto-generate), attach binaries, publish. CLI: `gh release create v1.0.0 --generate-notes`.
+
+### What is a .github folder and what files go in it?
+Special repository files: `.github/workflows/*.yml` (Actions), `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md`, `.github/CODEOWNERS`, `.github/dependabot.yml`, and community files like `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`.
+
+### What is Dependabot and secret scanning?
+Dependabot opens pull requests to update vulnerable or outdated dependencies (configure `.github/dependabot.yml`). Secret scanning detects committed credentials (tokens, API keys) and can block pushes with push protection. If a secret is detected, revoke it immediately.
+
+### What is the difference between GitHub, GitLab, and Bitbucket?
+All host Git repositories. GitHub has the largest community and Actions. GitLab includes built-in DevOps (GitLab CI/CD, registry, issue boards) and can be self-hosted easily. Bitbucket integrates tightly with Jira and Atlassian tools. Merge requests (GitLab) are the same idea as pull requests (GitHub).
+
+---
+
+## CATEGORY 4: ADVANCED AND LESS COMMON GIT COMMANDS
+
+### git rev-parse and git rev-list
+`git rev-parse HEAD` prints the full hash, `git rev-parse --short HEAD`, `git rev-parse --abbrev-ref HEAD` branch name, `git rev-parse --show-toplevel` repository root. `git rev-list --count HEAD` number of commits, `git rev-list --all` all commit hashes, `git rev-list main..feature` commits in feature not in main.
+
+### git log formatting and filtering recipes
+- `git log --oneline --graph --decorate --all` branch graph.
+- `git log --pretty=format:"%h %ad %an %s" --date=short` custom format (%h short hash, %an author, %ad date, %s subject).
+- `git log --since="2 weeks ago" --until="yesterday"`.
+- `git log --author="Name" --grep="fix" -i`.
+- `git log -- path/file` history of a path.
+- `git log -L 10,20:file.py` history of specific lines.
+- `git log --diff-filter=D --name-only` files that were deleted.
+- `git log --first-parent main` mainline history only.
+- `git log --merges --oneline`.
+- `git log --stat`, `git log -p -3`.
+- `git shortlog -sn --no-merges` commits per author.
+
+### git diff recipes
+`git diff --stat`, `git diff --name-status main..HEAD`, `git diff --word-diff`, `git diff --color-words`, `git diff -U0`, `git diff HEAD~3 HEAD -- file`, `git diff --check` (find whitespace errors), `git difftool` for a visual diff tool.
+
+### git show recipes
+`git show HEAD:path/file` file contents at HEAD, `git show main:README.md`, `git show --name-only HEAD`, `git show -s --format=%B HEAD` commit message only, `git show stash@{0}`.
+
+### git blame variants
+`git blame -w file` ignore whitespace, `git blame -C -C file` detect lines moved or copied between files, `git blame --ignore-rev <hash> file` skip a formatting commit, or use an ignore file `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
+### git restore and git switch (modern replacements for checkout)
+`git restore file` discard working changes, `git restore --staged file` unstage, `git restore --source=<commit> file` bring a file from another commit, `git restore -p` interactive. `git switch branch`, `git switch -c new`, `git switch -` previous branch, `git switch --detach <commit>`. `git checkout` still works for both jobs.
+
+### git stash in depth
+`git stash push -m "msg" -- path` stash only specific files, `git stash push -p` choose hunks, `git stash -u` include untracked, `git stash -a` include ignored too, `git stash list`, `git stash show -p stash@{1}`, `git stash apply stash@{1}`, `git stash pop`, `git stash drop`, `git stash clear`, `git stash branch name stash@{0}`. Stash conflicts: resolve like a merge, then `git stash drop` after `pop` conflict.
+
+### git cherry-pick in depth
+`git cherry-pick <hash>`, `git cherry-pick A^..B` inclusive range, `git cherry-pick -x <hash>` appends "(cherry picked from commit ...)", `git cherry-pick -m 1 <merge-hash>` pick a merge commit (mainline parent 1), `git cherry-pick --no-commit`, `--continue`, `--skip`, `--abort`.
+
+### git rebase options and tips
+`git rebase -i HEAD~5` interactive; `git rebase --autosquash` with fixup commits; `git rebase --onto main feature-base feature` move a branch; `git rebase --rebase-merges` keep merges; `git rebase -X ours|theirs` strategy options; `git pull --rebase` and `git config --global pull.rebase true`; `git config --global rebase.autoStash true` stash automatically; `git rebase --abort` to back out. Never rebase shared history.
+
+### git merge strategies and options
+`git merge --no-ff feature` force a merge commit, `git merge --squash feature` combine into staged changes, `git merge --ff-only`, `git merge -s ours other` record a merge but keep our content, `git merge -X theirs other` resolve conflicts in favor of the other branch, `git merge --abort`. Octopus merge combines more than two branches.
+
+### git rerere — reuse recorded resolutions
+`git config --global rerere.enabled true` makes Git remember how you resolved a conflict and reapply it automatically if the same conflict appears again (useful with repeated rebases).
+
+### git ls-remote and git remote update
+`git ls-remote origin` lists remote references (branches, tags) without cloning, `git ls-remote --tags origin`, `git remote update` fetch all remotes, `git remote prune origin` remove stale remote-tracking branches, `git fetch --all --prune`.
+
+### git branch advanced
+`git branch --sort=-committerdate`, `git branch --contains <hash>`, `git branch --merged main` (safe to delete), `git branch --no-merged main`, `git branch --set-upstream-to=origin/main main`, `git branch -vv` tracking info, `git branch --show-current`, `git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short) %(committerdate:relative)'`.
+
+### git reflog in depth
+`git reflog` lists where HEAD pointed recently, `git reflog show branch`, `git reflog expire --expire=now --all` then `git gc --prune=now` permanently remove unreachable objects (dangerous). Default expiry is about 90 days for reachable entries and 30 days for unreachable.
+
+### git bisect in depth
+`git bisect start HEAD v1.0` (bad then good), test, `git bisect good|bad`, `git bisect skip`, `git bisect log`, `git bisect visualize`, `git bisect run pytest -x` automated, `git bisect reset` finish. Efficient: finds a bad commit among 1000 in about 10 steps.
+
+### git notes, git bundle, git archive
+`git notes add -m "note" <hash>` attach a note without changing the commit. `git bundle create repo.bundle --all` packs a repository into one file for offline transfer; `git clone repo.bundle` restores. `git archive -o release.zip HEAD` exports a snapshot without .git.
+
+### git worktree
+`git worktree add ../hotfix-dir hotfix-branch` check out another branch in a new folder at the same time; `git worktree list`; `git worktree remove ../hotfix-dir`; `git worktree prune`.
+
+### git submodule and git subtree
+Submodule: `git submodule add URL path`, `git submodule update --init --recursive`, `git submodule update --remote`, `git clone --recurse-submodules URL`. It pins another repo at an exact commit; remember to commit the updated pointer. Subtree: `git subtree add --prefix=lib URL main --squash` copies another repo's content into a folder of your repo (no separate clone step for teammates).
+
+### git sparse-checkout and partial clone
+For large repositories: `git clone --filter=blob:none --sparse URL`, `git sparse-checkout set folderA folderB`. `git clone --depth 1` shallow clone; `git fetch --unshallow` to get full history.
+
+### git maintenance, gc, and repository size
+`git gc` repack and clean, `git maintenance start` background maintenance, `git count-objects -vH` size, `git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | sort -k3 -n -r | head` find the biggest objects.
+
+### git filter-repo to rewrite history
+Install separately (`pip install git-filter-repo`). Remove a file everywhere: `git filter-repo --path secrets.txt --invert-paths`; remove big files: `git filter-repo --strip-blobs-bigger-than 50M`; replace text: `git filter-repo --replace-text expressions.txt`; move a subfolder into its own repo: `git filter-repo --subdirectory-filter folder`. Run on a fresh clone; afterwards all hashes change and you must force push; collaborators must re-clone. Older alternatives: BFG Repo-Cleaner, `git filter-branch` (slow, discouraged).
+
+### git credential helpers
+`git config --global credential.helper manager` (Git Credential Manager on Windows and macOS), `store` (plain text file), `cache --timeout=3600` (memory). Remove saved credentials with `git credential reject` or from Windows Credential Manager when you get "Authentication failed" after a token change.
+
+### git config advanced: includes, per-folder identity, and aliases
+Use different identities for work and personal projects with conditional includes in `~/.gitconfig`:
+```
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig-work
+```
+Set repository-only values with `git config user.email "work@company.com"` (no --global). Useful aliases: `git config --global alias.st "status -sb"`, `alias.lg "log --oneline --graph --decorate --all"`, `alias.undo "reset --soft HEAD~1"`, `alias.last "log -1 HEAD"`.
+
+### .gitattributes: line endings, diffs, and LFS
+`* text=auto` normalizes line endings, `*.sh text eol=lf` forces LF, `*.png binary`, `*.pt filter=lfs diff=lfs merge=lfs -text` for Git LFS, `*.ipynb diff=...` custom diff drivers. Combined with `core.autocrlf` it prevents line-ending noise between Windows and Linux.
+
+### Git LFS (Large File Storage) step by step
+```
+git lfs install
+git lfs track "*.psd" "*.pt" "*.zip"
+git add .gitattributes
+git add file.pt
+git commit -m "Add model with LFS"
+git push
+```
+`git lfs ls-files` shows tracked files, `git lfs migrate import --include="*.pt" --everything` moves existing history into LFS (rewrites history). GitHub limits regular files to 100 MB and recommends repositories under about 1 to 5 GB; LFS has storage and bandwidth quotas.
+
+### git hooks list and examples
+Client hooks: `pre-commit` (lint/test before commit), `prepare-commit-msg`, `commit-msg` (validate message format), `pre-push`, `post-merge`, `post-checkout`. Server hooks: `pre-receive`, `update`, `post-receive`. Example pre-commit hook to block commits with "TODO-REMOVE":
+```
+#!/bin/sh
+if git diff --cached | grep -q "TODO-REMOVE"; then
+  echo "Remove TODO-REMOVE markers before committing."; exit 1
+fi
+```
+Save as `.git/hooks/pre-commit` and `chmod +x`. Share hooks with `git config core.hooksPath .githooks` or tools like pre-commit and Husky. Skip with `--no-verify`.
+
+### git signing commits (GPG and SSH)
+SSH signing: `git config --global gpg.format ssh`, `git config --global user.signingkey ~/.ssh/id_ed25519.pub`, `git config --global commit.gpgsign true`. Add the key on GitHub as a "Signing key". GPG: generate with `gpg --full-generate-key`, `git config --global user.signingkey KEYID`. Verify: `git log --show-signature`.
+
+### git commit templates and conventional commits
+`git config --global commit.template ~/.gitmessage`. Conventional Commits format: `type(scope): short description`, types `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`; breaking changes `feat!:` or a `BREAKING CHANGE:` footer. Tools such as commitlint and semantic-release can use them to automate versions and changelogs.
+
+---
+
+## CATEGORY 5: BRANCHING STRATEGIES AND TEAM WORKFLOWS
+
+### What are the main Git branching strategies?
+- GitHub Flow: `main` is always deployable; short-lived feature branches; pull requests; merge and deploy. Simple and common.
+- Git Flow: `main`, `develop`, `feature/*`, `release/*`, `hotfix/*`. Good for scheduled versioned releases.
+- Trunk-based development: very short-lived branches or direct commits to `main`, feature flags, strong CI.
+- GitLab Flow: environment branches (staging, production) on top of main.
+Choose based on release cadence and team size.
+
+### How do I do a hotfix on production?
+```
+git switch main && git pull
+git switch -c hotfix/payment-bug
+# fix and test
+git commit -am "Fix payment rounding bug"
+git push -u origin hotfix/payment-bug
+# open a PR to main, merge, tag
+git tag -a v1.2.1 -m "Hotfix 1.2.1" && git push origin v1.2.1
+```
+In Git Flow also merge the hotfix back into `develop`.
+
+### How do I do a code review well using Git?
+Keep PRs small, describe context and testing, review the diff (`git diff main...feature`), run it locally (`gh pr checkout 123`), comment on specific lines, ask for changes politely, require passing CI, and use squash merge for a tidy history if the team prefers.
+
+### How should I write a good commit message?
+Subject line in imperative mood, about 50 characters, no period ("Add login validation"). Blank line. Body wrapped at about 72 characters explaining what and why (not how). Reference issues (`Fixes #42`). One logical change per commit. Avoid messages like "update", "fix stuff", or "changes".
+
+### How should I organize commits before opening a PR?
+Clean up local history with `git rebase -i origin/main`: squash fixups, reword unclear messages, reorder, and drop debug commits. Only do this on commits not yet shared. Alternatively squash on merge.
+
+### Merge commit vs squash vs rebase: when to use which?
+Merge commit preserves full branch history and context (more noise). Squash merge makes one commit per PR (clean main, loses individual commits). Rebase merge replays commits linearly (clean, rewrites hashes). Many teams use squash for features and merge commits for releases.
+
+### How do I work on multiple features at the same time?
+Use one branch per feature, commit or stash before switching (`git stash push -m "wip"`), or use `git worktree add` to have several branches checked out in separate folders. Keep branches rebased or merged with main regularly.
+
+### How do I resolve a conflict between two long-lived branches?
+`git switch feature`, `git merge main` (or rebase), resolve each file, run tests, commit. Use `git diff --name-only --diff-filter=U` to list conflicted files, `git checkout --ours|--theirs file` to take a whole side, and enable `git config --global merge.conflictstyle zdiff3` for clearer markers (shows the common ancestor).
+
+### What is a monorepo vs polyrepo?
+Monorepo: many projects in one repository (easy cross-project changes, needs good tooling and sparse checkout at scale). Polyrepo: one repository per project (clear boundaries, harder to coordinate changes).
+
+---
+
+## CATEGORY 6: GIT INTERVIEW QUESTIONS AND SHORT ANSWERS
+
+### What is the difference between git fetch and git pull?
+`git fetch` downloads new commits and updates remote-tracking branches (like origin/main) without changing your working files or current branch. `git pull` is `git fetch` followed by `git merge` (or rebase with `--rebase`) into your current branch.
+
+### What is the difference between git merge and git rebase?
+Merge joins two histories with a merge commit and keeps the true history. Rebase re-applies your commits on top of another base, giving a linear history but rewriting commit hashes. Do not rebase commits that others already have.
+
+### What is the difference between git reset, git revert, and git restore?
+`reset` moves the branch pointer (and optionally index and files) and rewrites local history. `revert` creates a new commit that undoes an earlier commit (safe for shared branches). `restore` restores files in the working tree or staging area without moving branches.
+
+### What is the difference between git reset --soft, --mixed, and --hard?
+`--soft` moves HEAD only (changes stay staged). `--mixed` (default) moves HEAD and clears the staging area (changes stay in files). `--hard` moves HEAD, clears staging, and overwrites files (uncommitted work is lost).
+
+### What is the difference between git checkout, git switch, and git restore?
+`checkout` is the older multi-purpose command (switch branches or restore files). `switch` only changes branches. `restore` only restores files. The new commands are clearer and safer.
+
+### What is the difference between git stash pop and git stash apply?
+`apply` re-applies the stash and keeps it in the stash list. `pop` applies it and removes it (unless there is a conflict).
+
+### What is the difference between git clone and git fork?
+Clone copies a repository to your machine. Fork creates your own server-side copy of a repository on GitHub so you can change it without write access to the original.
+
+### What is the difference between origin and upstream?
+`origin` is your default remote (usually your fork or the repo you cloned). `upstream` is the original repository you forked from.
+
+### What is the difference between git add . , git add -A , and git add -u?
+`git add .` stages changes in the current directory and below (new, modified, deleted in modern Git). `git add -A` stages everything in the whole repository. `git add -u` stages only modifications and deletions of tracked files (not new files).
+
+### What is the difference between git diff, git diff --staged, and git diff HEAD?
+`git diff` shows unstaged changes (working directory vs index). `git diff --staged` shows staged changes vs the last commit. `git diff HEAD` shows all changes (staged and unstaged) vs the last commit.
+
+### What is the difference between a lightweight tag and an annotated tag?
+Lightweight is just a pointer to a commit. Annotated is a full object with tagger, date, message, and optional signature; recommended for releases.
+
+### What does git commit --amend do and when is it unsafe?
+It replaces the last commit with a new one (new message or added changes). It rewrites history, so it is unsafe if the commit has already been pushed and others pulled it; after amending a pushed commit you must force push (`--force-with-lease`).
+
+### What is git cherry-pick used for?
+Applying a specific commit from another branch onto the current branch, for example moving a bug fix to a release branch.
+
+### What is a fast-forward merge?
+A merge where the target branch has no new commits, so Git just moves its pointer forward to the other branch tip with no merge commit.
+
+### What is git reflog and why is it useful?
+It records every movement of HEAD and branch tips in your local repository, which lets you recover commits after a bad reset, rebase, or deleted branch.
+
+### What is the difference between `HEAD~` and `HEAD^`?
+`HEAD~N` goes N commits back along first parents. `HEAD^N` selects the Nth parent of a merge commit (`HEAD^2` is the second parent). For a normal commit `HEAD~1` equals `HEAD^`.
+
+### How do you find which commit broke the build?
+`git bisect start`, mark the bad and a known good commit, test each step, or automate with `git bisect run ./test.sh`. Also `git log -S "text"` and `git blame`.
+
+### How do you undo a pushed commit?
+`git revert <hash>` then push (safe). On a private branch you can `git reset --hard HEAD~1` and `git push --force-with-lease`.
+
+### How do you delete a file from Git history?
+Use `git filter-repo --path file --invert-paths` (or BFG), force push, and have everyone re-clone. If it was a secret, revoke it first.
+
+### How do you squash commits?
+`git rebase -i HEAD~N` and mark later commits as `squash` or `fixup`, or `git reset --soft HEAD~N && git commit -m "message"`, or use "Squash and merge" on GitHub.
+
+### How do you set up Git to ignore files globally?
+`git config --global core.excludesfile ~/.gitignore_global` and put patterns (`.DS_Store`, `.idea/`, `.vscode/`) in that file.
+
+### What is a bare repository?
+A repository with no working directory, only the contents of `.git`, used as a central shared remote. Create with `git init --bare`.
+
+### What is .gitkeep?
+A convention for an empty placeholder file so Git tracks an otherwise empty directory (Git does not track empty folders).
+
+### What is the difference between SSH and HTTPS remotes?
+HTTPS URLs (`https://github.com/user/repo.git`) authenticate with a token or credential manager. SSH URLs (`git@github.com:user/repo.git`) authenticate with SSH keys and avoid repeated prompts.
+
+### What is the difference between Git and SVN?
+Git is distributed (full history locally, offline work, cheap branches). SVN is centralized (single server, linear revision numbers, path-based branches).
+
+---
+
+## CATEGORY 7: GIT TROUBLESHOOTING (MORE ERRORS AND FIXES)
+
+### "fatal: unable to auto-detect email address" or "Author identity unknown"
+Set identity: `git config --global user.name "Name"` and `git config --global user.email "you@example.com"`.
+
+### "error: pathspec 'branch' did not match any file(s) known to git"
+The branch does not exist locally. Run `git fetch --all`, `git branch -a`, then `git switch branch` (creates a tracking branch if it exists on origin) or `git switch -c branch origin/branch`.
+
+### "fatal: A branch named 'x' already exists"
+Choose another name, switch to it (`git switch x`), or delete the old one (`git branch -D x`) if you are sure.
+
+### "error: cannot delete branch 'x' checked out at ..."
+You are on that branch or in another worktree. Switch to another branch first. Use `git worktree list` to find where it is checked out.
+
+### "error: The branch 'x' is not fully merged"
+`git branch -d` refuses unmerged work. Merge it first, or use `git branch -D x` if you really want to discard it.
+
+### "Updates were rejected because the tip of your current branch is behind"
+Your branch lacks remote commits. `git pull --rebase` (or `git pull`), resolve conflicts, then `git push`.
+
+### "! [remote rejected] main -> main (protected branch hook declined)"
+The branch is protected. Push a feature branch and open a pull request. Check required reviews, status checks, and signed commits.
+
+### "remote: Permission to USER/REPO.git denied" or "fatal: unable to access ... 403"
+You lack write access or use the wrong account or token. Check `git remote -v`, saved credentials (remove old ones from Windows Credential Manager or macOS Keychain), token scopes, and organization SSO authorization for the token. Fork the repo if you do not have write access.
+
+### "remote: Repository not found" or "fatal: repository ... not found"
+Wrong URL, typo in owner or repo name, private repo without access, or wrong credentials. Check `git remote -v` and log in with the right account.
+
+### "fatal: could not read from remote repository. Please make sure you have the correct access rights"
+SSH key not set up or not loaded. Run `ssh -T git@github.com`, `ssh-add -l`, add the key, or use HTTPS.
+
+### "Host key verification failed"
+The known_hosts entry changed or is missing. After confirming it is legitimate, `ssh-keygen -R github.com` then connect again and accept the new fingerprint.
+
+### "error: RPC failed; HTTP 400 / curl 55 / early EOF" when pushing large repos
+Raise the buffer: `git config --global http.postBuffer 524288000`, push in smaller pieces, use SSH instead of HTTPS, or move big files to Git LFS.
+
+### "fatal: refusing to merge unrelated histories"
+Use `git pull origin main --allow-unrelated-histories` only when you truly want to combine two independent repositories (common after creating a repo with a README on GitHub and a separate local init).
+
+### "error: you need to resolve your current index first"
+A merge or rebase is unfinished. Resolve conflicts, `git add` files, then `git commit` or `git rebase --continue`, or abort with `git merge --abort` or `git rebase --abort`.
+
+### "fatal: You have not concluded your merge (MERGE_HEAD exists)"
+Finish with `git commit` after resolving, or `git merge --abort`.
+
+### "error: Pulling is not possible because you have unmerged files"
+Resolve conflicts and `git add` them, or `git merge --abort`/`git reset --merge`.
+
+### "warning: refname 'x' is ambiguous"
+A branch and tag have the same name. Use `refs/heads/x` or `refs/tags/x`, or rename one.
+
+### "fatal: Unable to create '.git/index.lock': File exists"
+Another Git process is running or one crashed. Close Git tools (IDE, GUI) and, if none is running, delete `.git/index.lock`.
+
+### "error: insufficient permission for adding an object to repository database .git/objects"
+Wrong file ownership, often from using sudo once. Fix with `sudo chown -R $USER:$USER .git` (Linux/macOS).
+
+### "fatal: detected dubious ownership in repository"
+Git's safety check when the folder is owned by another user. If you trust it: `git config --global --add safe.directory /path/to/repo`.
+
+### "Filename too long" on Windows
+`git config --global core.longpaths true` and enable long paths in Windows settings.
+
+### Git shows all files as modified (line endings or file mode changes)
+Line endings: set `core.autocrlf` (true on Windows, input on Linux/macOS) or use `.gitattributes` with `* text=auto`. File mode: `git config core.fileMode false` when permission bits changed (for example on Windows or mounted drives).
+
+### Case-sensitivity problems when renaming files
+On Windows and macOS the filesystem is case-insensitive. Use `git mv Readme.md readme.md` (or two-step rename through a temp name) so Git records the change.
+
+### "fatal: bad revision" or "unknown revision or path not in the working tree"
+The commit, branch, or path does not exist as typed. Use `--` to separate paths from revisions (`git log -- file`), run `git fetch`, check spelling with `git branch -a` and `git log --oneline`.
+
+### My .gitignore is not working
+It only ignores untracked files. If a file is already tracked, run `git rm --cached file` (or `git rm -r --cached .`, then `git add .`), commit. Check rules with `git check-ignore -v path`. Make sure the file is named `.gitignore` (not `.gitignore.txt`), and patterns have correct slashes and no trailing spaces.
+
+### I committed to the wrong branch
+Not pushed yet: `git branch correct-branch` (keeps the commit), `git reset --hard HEAD~1` on the wrong branch, `git switch correct-branch`. Or use `git cherry-pick <hash>` onto the right branch, then reset the wrong one.
+
+### I committed a large file or secret by mistake
+Before pushing: `git reset --soft HEAD~1`, remove the file, add it to `.gitignore`, commit again. After pushing: for secrets, revoke and rotate immediately; then purge with `git filter-repo` or BFG and force push. For large files, remove from history the same way or use Git LFS.
+
+### I lost my changes after git reset --hard or a bad rebase
+If the work was committed: `git reflog`, find the hash before the mistake, `git reset --hard <hash>` or `git switch -c rescue <hash>`. Uncommitted changes that were never staged or stashed cannot be recovered by Git; try your editor's local history (VS Code Timeline) or file recovery tools.
+
+### I accidentally deleted a branch
+`git reflog` to find the last commit of that branch (look for "checkout: moving from <branch>" lines), then `git branch <branch> <hash>`. Remote branch: ask GitHub to restore via the PR page's "Restore branch" button, or push it again from a local copy.
+
+### My branch diverged from origin ("Your branch and 'origin/main' have diverged")
+Both have unique commits. Choose: `git pull --rebase` (replay yours on top), `git pull` (merge), or if the local commits are unwanted `git reset --hard origin/main`. After a local rebase you will need `git push --force-with-lease`.
+
+### Git is very slow in a large repository
+Run `git gc`, `git maintenance start`, enable the file system monitor (`git config core.fsmonitor true`, `core.untrackedCache true`), use `--depth` shallow or partial clones, sparse-checkout, exclude huge folders in `.gitignore`, move big binaries to LFS, and on Windows exclude the repo folder from antivirus scans.
+
+---
+
+## CATEGORY 8: GIT QUICK REFERENCE BY TASK
+
+### Setup and start
+`git config --global user.name`, `git config --global user.email`, `git init`, `git clone URL`, `git remote add origin URL`.
+
+### Save work
+`git status`, `git add file`, `git add -p`, `git commit -m "msg"`, `git commit --amend`, `git stash`, `git stash pop`.
+
+### Look at history and changes
+`git log --oneline --graph --all`, `git diff`, `git diff --staged`, `git show <hash>`, `git blame file`, `git log -S "text"`, `git reflog`.
+
+### Branches
+`git branch`, `git switch -c name`, `git switch name`, `git merge name`, `git rebase main`, `git branch -d name`, `git push origin --delete name`.
+
+### Sync with remote
+`git fetch`, `git pull --rebase`, `git push`, `git push -u origin name`, `git remote -v`, `git fetch --prune`.
+
+### Undo
+`git restore file`, `git restore --staged file`, `git reset --soft HEAD~1`, `git reset --hard HEAD~1`, `git revert <hash>`, `git clean -nd`, `git reflog`.
+
+### Releases and inspection
+`git tag -a v1.0.0 -m "msg"`, `git push origin v1.0.0`, `git describe --tags`, `git archive`, `git shortlog -sn`.
+
+---
+
+## CATEGORY 9: A TO Z GIT GLOSSARY
+
+### Git glossary A to F
+Alias (custom shortcut for a command), Amend (modify the last commit), Annotated tag (tag with metadata), Bare repository (no working tree), Bisect (binary search for a bad commit), Blame (show who changed each line), Blob (file content object), Branch (movable pointer to a commit), Checkout (switch or restore), Cherry-pick (apply one commit elsewhere), Clone (copy a repository), Commit (snapshot with message), Conflict (overlapping changes that need manual resolution), Detached HEAD (HEAD points to a commit not a branch), Diff (difference between versions), Fast-forward (move pointer without merge commit), Fetch (download remote changes without merging), Fork (server-side copy of a repository).
+
+### Git glossary G to M
+GC (garbage collection, cleanup), Hash (SHA identifier), HEAD (current commit pointer), Hook (script triggered by Git events), Index (staging area), LFS (Large File Storage), Log (history), Main (default branch name), Master (older default branch name), Merge (combine branches), Merge base (common ancestor of branches), Merge commit (commit with two parents), Mirror (exact copy of all refs).
+
+### Git glossary N to R
+Object (blob, tree, commit, tag), Origin (default remote name), Pack file (compressed object storage), Patch (set of changes as text), Pull (fetch plus merge or rebase), Pull request (request to merge a branch, with review), Push (upload commits), Rebase (replay commits on a new base), Ref (named pointer to a commit), Reflog (local log of HEAD movements), Remote (another copy of the repository), Repository (project with history), Reset (move HEAD and optionally index and files), Restore (restore files), Revert (new commit that undoes another).
+
+### Git glossary S to Z
+Shallow clone (limited history), SHA (hash identifying objects), Squash (combine commits into one), Stage (prepare changes for commit), Stash (shelve changes temporarily), Submodule (nested repository), Switch (change branch), Tag (name for a commit, often a release), Tracking branch (local branch linked to a remote branch), Tree (directory object), Untracked (file not in Git), Upstream (the remote branch a local branch follows, or the original repo of a fork), Worktree (additional checked-out working directory), Working directory (files on disk you edit).
+
+---
+
+## CATEGORY 10: GIT FOR STUDENTS, PORTFOLIOS, AND PROJECTS
+
+### How should I structure a GitHub repository for a project portfolio?
+Include a clear README (project purpose, features, screenshots or demo GIF, tech stack, installation and usage steps, example commands, architecture notes, results, future work, license), a `requirements.txt` or `pyproject.toml`, a `.gitignore`, `LICENSE`, a `docs/` or `examples/` folder, tests, and a clean commit history. Pin the best repositories on your GitHub profile and add topics and a short description.
+
+### What should a good README contain?
+Title and one-line description, badges (build, license), demo or screenshot, features list, tech stack, setup (clone, create venv, install dependencies, set environment variables, run), usage examples, project structure, how to run tests, roadmap, contributing notes, license, contact. Keep secrets out; provide `.env.example`.
+
+### What should I put in .gitignore for Python and AI/ML projects?
+```
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+.DS_Store
+.idea/
+.vscode/
+dist/
+build/
+*.egg-info/
+data/raw/
+models/*.pt
+*.log
+db/
+chroma_db/
+```
+Do not commit API keys, large datasets, or model weights (use Git LFS, DVC, or links to downloads).
+
+### How do I avoid committing API keys and secrets?
+Store them in a `.env` file listed in `.gitignore`, load with python-dotenv, and commit a `.env.example` with placeholder names. Use `git secrets`, pre-commit hooks, or GitHub secret scanning push protection. If a key is committed, revoke it right away, then purge history.
+
+### How do I show a clean commit history in a student project?
+Make small meaningful commits with clear messages, use feature branches and pull requests even when working alone, tag milestones (v0.1, v1.0), and avoid giant "final version" commits. Squash noisy fix commits before merging.
+
+### How do I track notebooks and large data in Git?
+Clear notebook outputs before committing (`jupyter nbconvert --clear-output --inplace nb.ipynb` or nbstripout), keep data out of Git (use DVC, Git LFS, cloud storage links), and commit small sample datasets for demos.
+
+### How do I collaborate on a team project as a student?
+Agree on a branching strategy, protect `main`, create issues and assign them, work on feature branches, open pull requests with reviews, pull often (`git pull --rebase`), and communicate when touching shared files. Use GitHub Projects or issues to track tasks.
+
+### How do I move an existing project folder into Git and GitHub?
+```
+cd existing-project
+git init -b main
+# create .gitignore first
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/USER/REPO.git
+git push -u origin main
+```
+Check `git status` before adding so you do not commit `venv`, `.env`, or large files.
+
+### How do I rename or move a GitHub repository without losing history?
+Rename in GitHub Settings → General → Repository name; GitHub redirects the old URL. Update your local remote: `git remote set-url origin NEW_URL`. Transfer ownership under Settings → Danger Zone.
+
+### How do I delete all history and start fresh (keeping the files)?
+Create an orphan branch: `git switch --orphan fresh`, `git add -A`, `git commit -m "Initial commit"`, delete the old branch, rename `fresh` to `main`, then `git push -f origin main`. This is destructive; collaborators must re-clone.
