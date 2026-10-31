@@ -20,3 +20,10 @@ chroma.sqlite3/
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# IDE
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

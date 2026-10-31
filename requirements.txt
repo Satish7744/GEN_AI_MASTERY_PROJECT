@@ -1,15 +1,11 @@
 streamlit
 python-dotenv
 chromadb
-pypdf
-groq
-google-genai
 langchain-chroma
 langchain-huggingface
 langchain-community
 langchain-core
 langchain-text-splitters
+langchain-groq
 sentence-transformers
-python-dotenv
-chromadb
 tqdm
