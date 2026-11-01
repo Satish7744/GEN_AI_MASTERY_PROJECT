@@ -1,104 +1,166 @@
-# Linux & Git Assistant
+# Git & Linux Assistant
 
-A beginner-friendly Gen AI course project that answers Linux and Git questions with
-**RAG (retrieval-augmented generation)**. It searches local Markdown notes, sends the
-most relevant excerpts to an LLM, and shows which notes informed the answer.
+A retrieval-augmented generation (RAG) chatbot that answers Git and Linux questions from a
+local knowledge base. It has a modern dark chat interface built with Streamlit, streams
+answers as they are written, and includes a Troubleshoot mode for pasted terminal errors.
 
-## How the pieces fit together
+> The assistant only suggests commands. It never runs anything on your computer.
 
-1. **Knowledge base:** Markdown files in `knowledge/` contain Linux and Git guidance.
-   Add your own `.txt`, `.md`, or text-based `.pdf` notes with the sidebar uploader;
-   uploaded notes are stored locally under `knowledge/uploads/`.
-2. **Chunking:** `assistant.py` splits the notes into overlapping sections.
-3. **Embeddings:** Chroma's local default embedding model turns each section and the
-   question into vectors. It downloads its model files the first time the app indexes
-   the notes.
-4. **Retrieval:** Chroma stores those vectors locally and selects the three closest
-   sections by cosine similarity.
-5. **Generation:** The selected sections, recent chat turns, and question are sent to
-   Groq or Gemini.
-6. **Citations:** PDF results include the source filename and page number.
-7. **Troubleshooting:** Paste a Linux or Git error, choose the OS/shell, and get a
-   guided diagnosis that starts with inspection steps and explains any suggested fix.
-8. **User interface:** Streamlit displays the conversation and sources.
+## Features
 
-Use the **Search in** selector in the sidebar to search all notes or limit retrieval to
-one document. For a question about a project PDF, select that PDF so unrelated Linux
-and Git notes cannot be included in the retrieved context.
+- **Grounded answers:** responses come from your own Linux and Git knowledge-base documents,
+  not from the model's memory alone.
+- **Chat interface:** welcome screen with suggested questions, streaming replies, loading
+  indicator, syntax-highlighted code blocks with a copy button, and styled warning/note callouts.
+- **Conversations:** a sidebar with titled chats, search, and delete. Follow-up questions
+  are understood in context (the last 6 messages are used).
+- **Troubleshoot mode:** paste a command and its error output and get a structured answer:
+  Diagnosis, Likely cause, Fix, Verify.
+- **Responsive layout:** works on desktop, tablet and mobile widths, with a collapsible sidebar.
 
-Choose **Troubleshoot an error** in the sidebar and paste the terminal output. The
-assistant infers the command and shell where possible, then leads with a likely fix and
-copy-ready command. Remove API keys, passwords, and private data before submitting.
-The assistant suggests commands for review; it never runs them on your computer.
+## How it works
 
-This keeps the RAG steps visible for learning rather than hiding them behind a framework.
-The app only suggests commands; it never runs them.
+1. **Knowledge base:** `.txt` files in `docs/` are written as entries that start with a `###`
+   heading, grouped under `##` categories.
+2. **Chunking:** `ingestion_pipeline.py` creates one chunk per entry. Long entries are split
+   (max 1200 characters) and each piece repeats its category and heading so it stays
+   self-describing.
+3. **Embeddings:** each chunk is embedded with `sentence-transformers/all-MiniLM-L6-v2`
+   (runs locally on CPU) and stored in a local Chroma database (`db/chroma_db`, cosine similarity).
+4. **Retrieval:** your question is rewritten into a standalone search query if it is a
+   follow-up, then the top 6 chunks are retrieved.
+5. **Generation:** the chunks, recent chat turns and your question go to an LLM on Groq
+   (default model `openai/gpt-oss-120b`), which streams back the answer.
+6. **Interface:** `app.py` and `ui.py` render everything with Streamlit.
 
-## Run locally
+```
+Question -> rewrite (if follow-up) -> embed -> Chroma top-6 -> LLM (Groq) -> streamed answer
+```
 
-1. Install Python 3.10 or newer.
-2. Open a terminal in this folder and create a virtual environment:
+## Project structure
 
-   ```bash
-   python -m venv .venv
-   ```
+```
+.
+├── app.py                       # Streamlit app: state, sidebar, chat flow
+├── ui.py                        # Theme CSS and reusable UI components
+├── rag.py                       # RAG engine: rewrite, retrieve, stream answer
+├── ingestion_pipeline.py        # Load docs, chunk, embed, store in Chroma
+├── history_aware_generation.py  # Terminal chat version (same engine as the app)
+├── retrieval_pipeline.py        # Standalone retrieval test script
+├── answer_generation_1.py       # Earlier answer-generation experiment
+├── check_index.py               # Diagnostic: chunk count and ranking checks
+├── docs/                        # Knowledge-base .txt files
+├── .streamlit/config.toml       # Dark theme settings
+├── requirements.txt
+└── .env.example
+```
 
-3. Activate it:
+`db/` is created automatically and is not committed.
 
-   ```bash
-   # Linux/macOS
-   source .venv/bin/activate
+## Setup
 
+**Requirements:** Python 3.10 or newer and a free [Groq API key](https://console.groq.com).
+
+1. Create and activate a virtual environment:
+
+   ```powershell
    # Windows PowerShell
-   .venv\Scripts\Activate.ps1
+   python -m venv venv
+   venv\Scripts\Activate.ps1
    ```
-
-4. Install dependencies (Chroma's first installation adds a few packages):
 
    ```bash
-   python -m pip install -r requirements.txt
+   # Linux / macOS
+   python3 -m venv venv
+   source venv/bin/activate
    ```
 
-5. Copy `.env.example` to `.env`. Add a key for **one** provider:
+2. Install dependencies:
 
-   ```dotenv
-   GROQ_API_KEY=your_groq_key_here
+   ```bash
+   pip install -r requirements.txt
    ```
 
-   Or use `GEMINI_API_KEY` instead. Keep `.env` private; it is ignored by Git. Model
-   names can be changed with `GROQ_MODEL` or `GEMINI_MODEL` if your provider account
-   does not have access to the defaults.
+3. Copy `.env.example` to `.env` and add your key:
 
-6. Start the app:
+   ```
+   GROQ_API_KEY=your_key_here
+   # optional: GROQ_MODEL=openai/gpt-oss-120b
+   ```
+
+   Keep `.env` private. It is ignored by Git.
+
+4. Build the search index (first run downloads the embedding model):
+
+   ```bash
+   python ingestion_pipeline.py
+   ```
+
+5. Start the app:
 
    ```bash
    streamlit run app.py
    ```
 
-## Example questions
+If the index does not exist yet, `rag.py` builds it automatically on first start.
 
-- What does `git restore --staged` do?
-- How can I see hidden files in Linux?
-- What should I inspect before using `git reset --hard`?
+## Usage
 
-## Limitations and next steps
+- Ask a question in the chat box, or click a suggestion on the welcome screen.
+- Press **Enter** to send and **Shift+Enter** for a new line.
+- Switch on **Troubleshoot mode** in the sidebar, then paste a command with its error output.
+- Use **New chat** to start over and the sidebar search to find earlier chats.
 
-- The local embedding model improves meaning-based search, but can still retrieve
-  imperfect matches. Review the Sources shown with each answer.
-- Uploaded notes and the Chroma index stay on your computer. Matching text excerpts
-  are sent to the selected Groq or Gemini provider when the app answers a question.
-- Chroma stores its local index in `chroma_db/`; this folder is ignored by Git and can
-  be rebuilt from the Markdown files in `knowledge/`.
-- The bundled notes are a small teaching knowledge base, not a substitute for the
-  official documentation or careful review of commands.
-- The uploader accepts UTF-8 text, Markdown, and text-based PDFs up to 5 MB each.
-  Scanned PDFs need OCR, which this version does not include.
-- Chat context includes only the six most recent conversation turns and lasts for the
-  current browser session.
+Example questions:
 
-## Provider documentation
+- What is Git?
+- How do I undo my last commit?
+- How do I find which process is using port 8080?
+- Explain Linux file permissions.
 
-- [Groq text generation](https://console.groq.com/docs/text-chat)
-- [Gemini API](https://ai.google.dev/gemini-api/docs/generate-content)
-- [Gemini model names](https://ai.google.dev/gemini-api/docs/models)
-- [Groq supported models](https://console.groq.com/docs/models)
+## Updating the knowledge base
+
+1. Add or edit `.txt` files in `docs/`. Start each entry with `### Title` and group entries
+   under `## CATEGORY ...` headings.
+2. Rebuild the index so the changes are picked up:
+
+   ```bash
+   python ingestion_pipeline.py --rebuild
+   ```
+
+   Without `--rebuild`, an existing index is reused and new documents are not indexed.
+
+If a question gets "I don't have enough information...", the usual cause is a missing entry.
+Add a short entry written the way people ask the question, then rebuild.
+
+## Terminal version
+
+```bash
+python history_aware_generation.py
+```
+
+Prints the retrieved chunks for each question, which is useful for debugging retrieval.
+
+## Configuration
+
+| Setting | Where | Default |
+|---|---|---|
+| LLM provider key | `GROQ_API_KEY` in `.env` | none (required) |
+| LLM model | `GROQ_MODEL` in `.env` | `openai/gpt-oss-120b` |
+| Chunks retrieved | `DEFAULT_K` in `rag.py` | 6 |
+| Max chunk size | `max_chars` in `ingestion_pipeline.py` | 1200 characters |
+| Embedding model | `ingestion_pipeline.py` and `rag.py` | `all-MiniLM-L6-v2` |
+
+## Limitations
+
+- Answers are only as good as the documents. Topics missing from `docs/` get a refusal.
+- Embedding search is weak on bare symbols and flags (for example, just "-m"). Entries that
+  explain such flags in plain words help.
+- Chats are kept in the browser session only and are lost on page refresh.
+- Matching document excerpts are sent to Groq to generate each answer.
+- The knowledge base is a learning resource. Check destructive commands (`rm -rf`,
+  `git reset --hard`, `dd`) before running them.
+
+## Tech stack
+
+Python, Streamlit, LangChain, Chroma, Hugging Face sentence-transformers, Groq.
