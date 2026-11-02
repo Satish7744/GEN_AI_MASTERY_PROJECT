@@ -24,12 +24,12 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 ui.inject_css()
-
-try:
-    import rag
-except Exception as exc:  # missing API key, missing docs, etc.
-    ui.render_error(f"Could not start the assistant: {exc}")
-    st.stop()
+with st.spinner("Starting the assistant. The first run builds the index and can take 1-2 minutes..."):
+    try:
+        import rag
+    except Exception as exc:  # missing API key, missing docs, etc.
+        ui.render_error(f"Could not start the assistant: {exc}")
+        st.stop()
 
 K = rag.DEFAULT_K
 HISTORY_TURNS = 6  # messages sent back to the model as conversation context
